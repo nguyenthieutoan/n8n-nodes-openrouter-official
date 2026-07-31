@@ -22,7 +22,7 @@ describe('OpenRouter Node', () => {
 			return undefined;
 		});
 
-		mockExecuteFunctions.helpers.httpRequestWithAuthentication.mockResolvedValue({
+		(mockExecuteFunctions.helpers.httpRequestWithAuthentication as jest.Mock).mockResolvedValue({
 			data: [
 				{ url: 'https://example.com/image.png', b64_json: 'mock-base64' }
 			]
@@ -60,7 +60,7 @@ describe('OpenRouter Node', () => {
 		mockExecuteFunctions.continueOnFail.mockReturnValue(false);
 
 		const apiError = new Error('API Error');
-		mockExecuteFunctions.helpers.httpRequestWithAuthentication.mockRejectedValue(apiError);
+		(mockExecuteFunctions.helpers.httpRequestWithAuthentication as jest.Mock).mockRejectedValue(apiError);
 
 		await expect(node.execute.call(mockExecuteFunctions)).rejects.toThrow();
 	});
@@ -79,7 +79,7 @@ describe('OpenRouter Node', () => {
 		mockExecuteFunctions.continueOnFail.mockReturnValue(true);
 
 		const apiError = new Error('API Error');
-		mockExecuteFunctions.helpers.httpRequestWithAuthentication.mockRejectedValue(apiError);
+		(mockExecuteFunctions.helpers.httpRequestWithAuthentication as jest.Mock).mockRejectedValue(apiError);
 
 		const result = await node.execute.call(mockExecuteFunctions);
 		
