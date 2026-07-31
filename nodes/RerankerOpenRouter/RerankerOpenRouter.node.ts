@@ -129,9 +129,9 @@ export class RerankerOpenRouter implements INodeType {
 					json: true,
 				});
 				let results = response.data.map((m: any) => ({
-					name: m.name || m.id,
+					name: m.id,
 					value: m.id,
-					description: m.architecture?.modality ? `Modality: ${m.architecture.modality}` : undefined,
+					description: m.name,
 				}));
 
 				if (filter) {
