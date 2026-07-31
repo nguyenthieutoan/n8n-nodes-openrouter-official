@@ -12,7 +12,8 @@ describe('OpenRouter Node', () => {
 	function createMockExecuteFunctions() {
 		const mockExecuteFunctions = mock<IExecuteFunctions>();
 		mockExecuteFunctions.helpers = {
-			httpRequestWithAuthentication: jest.fn(),
+			request: jest.fn(),
+			prepareBinaryData: jest.fn().mockResolvedValue('mock-binary-data'),
 		} as any;
 		mockExecuteFunctions.getInputData.mockReturnValue([{ json: {} }]);
 		mockExecuteFunctions.getCredentials.mockResolvedValue({ apiKey: 'mock-key', siteUrl: '', appName: '' });
@@ -23,18 +24,19 @@ describe('OpenRouter Node', () => {
 		const mockExecuteFunctions = createMockExecuteFunctions();
 		
 		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-			if (paramName === 'resource') return 'image';
-			if (paramName === 'operation') return 'generate';
+			if (paramName === 'operation') return 'generateImage';
 			if (paramName === 'prompt') return 'a cute cat';
 			if (paramName === 'model') return 'mock-model';
-			if (paramName === 'download') return false;
+			if (paramName === 'resolution') return '1K';
+			if (paramName === 'aspectRatio') return '16:9';
 			return undefined;
 		});
 
-		(mockExecuteFunctions.helpers.httpRequestWithAuthentication as jest.Mock).mockResolvedValue({
+		(mockExecuteFunctions.helpers.request as jest.Mock).mockResolvedValue({
 			data: [
 				{ url: 'https://example.com/image.png', b64_json: 'mock-base64' }
-			]
+			],
+			usage: { total_tokens: 10 }
 		});
 
 		const result = await node.execute.call(mockExecuteFunctions);
@@ -42,19 +44,21 @@ describe('OpenRouter Node', () => {
 		expect(result).toHaveLength(1);
 		expect(result[0]).toHaveLength(1);
 		expect(result[0][0].json).toEqual({
-			url: 'https://example.com/image.png',
-			b64_json: 'mock-base64'
+			prompt: 'a cute cat',
+			usage: { total_tokens: 10 }
 		});
+		expect(result[0][0].binary?.data).toEqual('mock-binary-data');
 	});
 
 	it('should throw NodeApiError on API failure (Failed API)', async () => {
 		const mockExecuteFunctions = createMockExecuteFunctions();
 		
 		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-			if (paramName === 'resource') return 'image';
-			if (paramName === 'operation') return 'generate';
+			if (paramName === 'operation') return 'generateImage';
 			if (paramName === 'prompt') return 'test';
 			if (paramName === 'model') return 'mock-model';
+			if (paramName === 'resolution') return '1K';
+			if (paramName === 'aspectRatio') return '16:9';
 			return undefined;
 		});
 		mockExecuteFunctions.getNode.mockReturnValue({
@@ -68,7 +72,7 @@ describe('OpenRouter Node', () => {
 		mockExecuteFunctions.continueOnFail.mockReturnValue(false);
 
 		const apiError = new Error('API Error');
-		(mockExecuteFunctions.helpers.httpRequestWithAuthentication as jest.Mock).mockRejectedValue(apiError);
+		(mockExecuteFunctions.helpers.request as jest.Mock).mockRejectedValue(apiError);
 
 		await expect(node.execute.call(mockExecuteFunctions)).rejects.toThrow();
 	});
@@ -77,16 +81,17 @@ describe('OpenRouter Node', () => {
 		const mockExecuteFunctions = createMockExecuteFunctions();
 		
 		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-			if (paramName === 'resource') return 'image';
-			if (paramName === 'operation') return 'generate';
+			if (paramName === 'operation') return 'generateImage';
 			if (paramName === 'prompt') return 'test';
 			if (paramName === 'model') return 'mock-model';
+			if (paramName === 'resolution') return '1K';
+			if (paramName === 'aspectRatio') return '16:9';
 			return undefined;
 		});
 		mockExecuteFunctions.continueOnFail.mockReturnValue(true);
 
 		const apiError = new Error('API Error');
-		(mockExecuteFunctions.helpers.httpRequestWithAuthentication as jest.Mock).mockRejectedValue(apiError);
+		(mockExecuteFunctions.helpers.request as jest.Mock).mockRejectedValue(apiError);
 
 		const result = await node.execute.call(mockExecuteFunctions);
 		
