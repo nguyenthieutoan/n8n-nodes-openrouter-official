@@ -49,7 +49,7 @@ export class EmbeddingsOpenRouter implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'OpenRouter Embeddings',
 		name: 'embeddingsOpenRouter',
-		icon: 'file:openrouter.svg',
+		icon: { light: 'file:openrouter.svg', dark: 'file:openrouter.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		description: 'Generate vector embeddings from text and images using OpenRouter',

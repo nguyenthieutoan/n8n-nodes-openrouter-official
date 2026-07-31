@@ -49,7 +49,7 @@ export class RerankerOpenRouter implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'OpenRouter Reranker',
 		name: 'rerankerOpenRouter',
-		icon: 'file:openrouter.svg',
+		icon: { light: 'file:openrouter.svg', dark: 'file:openrouter.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		description: 'Use OpenRouter to reorder documents by relevance to the given query',
