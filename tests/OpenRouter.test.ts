@@ -15,6 +15,7 @@ describe('OpenRouter Node', () => {
 			httpRequestWithAuthentication: jest.fn(),
 		} as any;
 		mockExecuteFunctions.getInputData.mockReturnValue([{ json: {} }]);
+		mockExecuteFunctions.getCredentials.mockResolvedValue({ apiKey: 'mock-key', siteUrl: '', appName: '' });
 		return mockExecuteFunctions;
 	}
 
