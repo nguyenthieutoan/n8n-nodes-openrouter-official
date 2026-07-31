@@ -36,7 +36,7 @@
       "dist/nodes/RerankerOpenRouter/RerankerOpenRouter.node.js"
     ],
     "credentials": [
-      "dist/credentials/OpenRouterApi.credentials.js"
+      "dist/credentials/OpenRouterCommunityApi.credentials.js"
     ]
   },
   "peerDependencies": {

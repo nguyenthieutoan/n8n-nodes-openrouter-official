@@ -4,8 +4,8 @@ import {
 	INodeProperties,
 } from 'n8n-workflow';
 
-export class OpenRouterApi implements ICredentialType {
-	name = 'openRouterApi';
+export class OpenRouterCommunityApi implements ICredentialType {
+	name = 'openRouterCommunityApi';
 	displayName = 'OpenRouter API';
 	documentationUrl = 'https://openrouter.ai/keys';
 	properties: INodeProperties[] = [

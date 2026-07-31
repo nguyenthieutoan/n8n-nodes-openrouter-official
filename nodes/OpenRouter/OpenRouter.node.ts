@@ -24,7 +24,7 @@ export class OpenRouter implements INodeType {
 		outputs: ['main'],
 		credentials: [
 			{
-				name: 'openRouterApi',
+				name: 'openRouterCommunityApi',
 				required: true,
 			},
 		],
@@ -189,7 +189,7 @@ export class OpenRouter implements INodeType {
 	methods = {
 		listSearch: {
 			async searchModels(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
-				const credentials = await this.getCredentials('openRouterApi');
+				const credentials = await this.getCredentials('openRouterCommunityApi');
 				const response = await this.helpers.request({
 					method: 'GET',
 					url: 'https://openrouter.ai/api/v1/models',
@@ -231,7 +231,7 @@ export class OpenRouter implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
-		const credentials = await this.getCredentials<{ apiKey: string, siteUrl?: string, appName?: string }>('openRouterApi');
+		const credentials = await this.getCredentials<{ apiKey: string, siteUrl?: string, appName?: string }>('openRouterCommunityApi');
 		const operation = this.getNodeParameter('operation', 0) as string;
 
 		const defaultHeaders = {

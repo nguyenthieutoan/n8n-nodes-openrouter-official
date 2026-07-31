@@ -75,7 +75,7 @@ export class EmbeddingsOpenRouter implements INodeType {
 		outputNames: ['Embeddings'],
 		credentials: [
 			{
-				name: 'openRouterApi',
+				name: 'openRouterCommunityApi',
 				required: true,
 			},
 		],
@@ -119,7 +119,7 @@ export class EmbeddingsOpenRouter implements INodeType {
 	methods = {
 		listSearch: {
 			async searchModels(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
-				const credentials = await this.getCredentials('openRouterApi');
+				const credentials = await this.getCredentials('openRouterCommunityApi');
 				const response = await this.helpers.request({
 					method: 'GET',
 					url: 'https://openrouter.ai/api/v1/models',
@@ -145,7 +145,8 @@ export class EmbeddingsOpenRouter implements INodeType {
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
-		const credentials = await this.getCredentials<{ apiKey: string, siteUrl?: string, appName?: string }>('openRouterApi');
+		const credentials = await this.getCredentials<{ apiKey: string, siteUrl?: string, appName?: string }>('openRouterCommunityApi');
+
 		let modelName = this.getNodeParameter('model', itemIndex) as any;
 		if (modelName && typeof modelName === 'object' && modelName.value) {
 			modelName = modelName.value;
