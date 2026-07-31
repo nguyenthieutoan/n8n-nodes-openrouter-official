@@ -1,5 +1,6 @@
 import {
 	IAuthenticateGeneric,
+	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
 } from 'n8n-workflow';
@@ -41,6 +42,16 @@ export class OpenRouterCommunityApi implements ICredentialType {
 				Authorization: '={{"Bearer " + $credentials.apiKey}}',
 				'HTTP-Referer': '={{$credentials.siteUrl}}',
 				'X-Title': '={{$credentials.appName}}',
+			},
+		},
+	};
+
+	test: ICredentialTestRequest = {
+		request: {
+			baseURL: 'https://openrouter.ai/api/v1',
+			url: '/auth/key',
+			headers: {
+				Authorization: '={{"Bearer " + $credentials.apiKey}}',
 			},
 		},
 	};
