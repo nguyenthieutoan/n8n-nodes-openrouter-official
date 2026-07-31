@@ -5,6 +5,7 @@ import {
 	type ISupplyDataFunctions,
 	type ILoadOptionsFunctions,
 	type SupplyData,
+	type INodeListSearchResult,
 } from 'n8n-workflow';
 import { OpenAIEmbeddings } from '@langchain/openai';
 
@@ -82,19 +83,42 @@ export class EmbeddingsOpenRouter implements INodeType {
 			{
 				displayName: 'Model',
 				name: 'model',
-				type: 'options',
-				typeOptions: {
-					loadOptionsMethod: 'getModels',
-				},
-				default: '',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
+				required: true,
 				description: 'The OpenRouter model to use for generating embeddings',
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchModels',
+							searchable: true,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						validation: [
+							{
+								type: 'regex',
+								properties: {
+									regex: '.*',
+									errorMessage: 'Not a valid model ID',
+								},
+							},
+						],
+					},
+				],
 			},
 		],
 	};
 
 	methods = {
-		loadOptions: {
-			async getModels(this: ILoadOptionsFunctions) {
+		listSearch: {
+			async searchModels(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
 				const credentials = await this.getCredentials('openRouterApi');
 				const response = await this.helpers.request({
 					method: 'GET',
@@ -104,18 +128,29 @@ export class EmbeddingsOpenRouter implements INodeType {
 					},
 					json: true,
 				});
-				return response.data
-					.map((m: { id: string; name: string }) => ({
-						name: m.name || m.id,
-						value: m.id,
-					}));
+				let results = response.data.map((m: any) => ({
+					name: m.name || m.id,
+					value: m.id,
+					description: m.architecture?.modality ? `Modality: ${m.architecture.modality}` : undefined,
+				}));
+
+				if (filter) {
+					const f = filter.toLowerCase();
+					results = results.filter((m: any) => m.name.toLowerCase().includes(f) || m.value.toLowerCase().includes(f));
+				}
+				
+				return { results };
 			},
 		},
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
 		const credentials = await this.getCredentials<{ apiKey: string, siteUrl?: string, appName?: string }>('openRouterApi');
-		const modelName = this.getNodeParameter('model', itemIndex) as string;
+		let modelName = this.getNodeParameter('model', itemIndex) as any;
+		if (modelName && typeof modelName === 'object' && modelName.value) {
+			modelName = modelName.value;
+		}
+		modelName = modelName as string;
 
 		const embeddings = new OpenAIEmbeddings({
 			openAIApiKey: credentials.apiKey,
