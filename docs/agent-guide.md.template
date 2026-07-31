@@ -1,0 +1,53 @@
+# {{SERVICE_NAME}} — Agent Guide
+
+> This document helps AI Agents (not the node developer) understand and use this node when building n8n workflows.
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **Package** | `n8n-nodes-{{SERVICE_SLUG}}` |
+| **Node Type** | {{NODE_TYPE}} |
+| **Connection Type** | {{CONNECTION_TYPE}} |
+| **Credential** | {{CREDENTIAL_DISPLAY_NAME}} |
+
+## What This Node Does
+
+{{OVERVIEW_DESCRIPTION}}
+
+## Credentials Setup
+
+1. {{STEP_1}}
+2. {{STEP_2}}
+3. In n8n: Settings → Credentials → Add credential → Select "{{CREDENTIAL_DISPLAY_NAME}}"
+
+## Operations
+
+| Resource | Operation | Description | Required Fields |
+|----------|-----------|-------------|----------------|
+| {{RESOURCE}} | {{OPERATION}} | {{OP_DESCRIPTION}} | {{REQUIRED_FIELDS}} |
+
+## Connection Types
+
+| Direction | Type | Description |
+|-----------|------|-------------|
+| Input | {{INPUT_TYPE}} | {{INPUT_DESC}} |
+| Output | {{OUTPUT_TYPE}} | {{OUTPUT_DESC}} |
+
+## Common Workflow Patterns
+
+### Pattern 1: {{PATTERN_NAME}}
+```
+{{PATTERN_DESCRIPTION}}
+```
+
+## Gotchas & Known Issues
+
+- {{GOTCHA_1}}
+- {{GOTCHA_2}}
+
+## Parameter Reference
+
+| Parameter | Type | Default | Required | Description |
+|-----------|------|---------|----------|-------------|
+| {{PARAM_NAME}} | {{PARAM_TYPE}} | {{DEFAULT}} | {{REQUIRED}} | {{PARAM_DESC}} |

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+.npmrc
+
+# Ignore internal docs (not for git/npm)
+*.md
+!README.md
+!RELEASE.md
+!docs/**/*.md

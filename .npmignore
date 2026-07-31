@@ -1,0 +1,19 @@
+# Source files (only dist/ goes to npm)
+nodes/**/*.ts
+credentials/**/*.ts
+index.ts
+tsconfig.json
+gulpfile.js
+jest.config.js
+
+# Dev/CI files
+.github/
+.gitignore
+compose.yaml
+tests/
+coverage/
+docs/
+
+# Internal docs
+*.md
+!README.md
