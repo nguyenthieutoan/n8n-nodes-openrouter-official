@@ -8,6 +8,43 @@ import {
 } from 'n8n-workflow';
 import { OpenAIEmbeddings } from '@langchain/openai';
 
+/* eslint-disable @typescript-eslint/no-var-requires */
+export function requireN8nDependency(dependencyName: string): any {
+	try { return require(dependencyName); } catch (_) {}
+	if (require.main && require.main.paths) {
+		try {
+			const p = require.resolve(dependencyName, { paths: require.main.paths });
+			return require(p);
+		} catch (_) {}
+	}
+	try {
+		const workflowResolve = require.resolve('n8n-workflow');
+		const index = workflowResolve.indexOf('node_modules');
+		if (index !== -1) {
+			const base = workflowResolve.substring(0, index + 12);
+			return require(base + '/' + dependencyName);
+		}
+	} catch (_) {}
+	throw new Error(`Could not resolve ${dependencyName} from n8n's runtime`);
+}
+
+export function getAiUtilities(): any {
+	try {
+		const dep = ['@n8n', 'ai-utilities'].join('/');
+		return requireN8nDependency(dep);
+	} catch (e) {
+		return {
+			getConnectionHintNoticeField: (hints: any) => ({
+				displayName: '',
+				name: 'notice',
+				type: 'notice',
+				default: '',
+			}),
+			logWrapper: (instance: any, context: any) => instance,
+		};
+	}
+}
+
 export class EmbeddingsOpenRouter implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'OpenRouter Embeddings',
@@ -93,7 +130,7 @@ export class EmbeddingsOpenRouter implements INodeType {
 		});
 
 		return {
-			response: embeddings,
+			response: getAiUtilities().logWrapper(embeddings, this),
 		};
 	}
 }
