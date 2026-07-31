@@ -32,8 +32,8 @@
   "n8n": {
     "nodes": [
       "dist/nodes/OpenRouter/OpenRouter.node.js",
-      "dist/nodes/OpenRouterEmbeddings/EmbeddingsOpenRouter.node.js",
-      "dist/nodes/OpenRouterReranker/RerankerOpenRouter.node.js"
+      "dist/nodes/EmbeddingsOpenRouter/EmbeddingsOpenRouter.node.js",
+      "dist/nodes/RerankerOpenRouter/RerankerOpenRouter.node.js"
     ],
     "credentials": [
       "dist/credentials/OpenRouterApi.credentials.js"
