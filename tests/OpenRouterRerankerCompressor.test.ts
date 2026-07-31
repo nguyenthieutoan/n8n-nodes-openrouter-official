@@ -1,4 +1,4 @@
-import { OpenRouterRerankerAdapter } from '../nodes/OpenRouterReranker/OpenRouterRerankerCompressor';
+import { OpenRouterRerankerAdapter } from '../nodes/RerankerOpenRouter/OpenRouterRerankerCompressor';
 import { Document } from '@langchain/core/documents';
 
 global.fetch = jest.fn();
