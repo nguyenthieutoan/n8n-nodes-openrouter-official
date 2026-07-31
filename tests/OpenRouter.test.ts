@@ -9,10 +9,18 @@ describe('OpenRouter Node', () => {
 		node = new OpenRouter();
 	});
 
-	it('should process Generate Image successfully (Happy Path)', async () => {
+	function createMockExecuteFunctions() {
 		const mockExecuteFunctions = mock<IExecuteFunctions>();
-		
+		mockExecuteFunctions.helpers = {
+			httpRequestWithAuthentication: jest.fn(),
+		} as any;
 		mockExecuteFunctions.getInputData.mockReturnValue([{ json: {} }]);
+		return mockExecuteFunctions;
+	}
+
+	it('should process Generate Image successfully (Happy Path)', async () => {
+		const mockExecuteFunctions = createMockExecuteFunctions();
+		
 		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
 			if (paramName === 'resource') return 'image';
 			if (paramName === 'operation') return 'generate';
@@ -39,9 +47,8 @@ describe('OpenRouter Node', () => {
 	});
 
 	it('should throw NodeApiError on API failure (Failed API)', async () => {
-		const mockExecuteFunctions = mock<IExecuteFunctions>();
+		const mockExecuteFunctions = createMockExecuteFunctions();
 		
-		mockExecuteFunctions.getInputData.mockReturnValue([{ json: {} }]);
 		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
 			if (paramName === 'resource') return 'image';
 			if (paramName === 'operation') return 'generate';
@@ -66,9 +73,8 @@ describe('OpenRouter Node', () => {
 	});
 
 	it('should handle continueOnFail when API fails', async () => {
-		const mockExecuteFunctions = mock<IExecuteFunctions>();
+		const mockExecuteFunctions = createMockExecuteFunctions();
 		
-		mockExecuteFunctions.getInputData.mockReturnValue([{ json: {} }]);
 		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
 			if (paramName === 'resource') return 'image';
 			if (paramName === 'operation') return 'generate';
