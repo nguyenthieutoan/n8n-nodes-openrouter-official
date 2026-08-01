@@ -32,6 +32,9 @@ export class OpenRouter implements INodeType {
 			{
 				displayName: 'Operation',
 				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				options: [
 					{
 						name: 'Chat / Generate Text',
 						value: 'message',
