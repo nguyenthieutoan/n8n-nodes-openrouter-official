@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-openrouter-official",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "The Ultimate OpenRouter Toolkit for n8n. Includes a unified Multimodal Action Node, Embeddings, and Advanced Reranker to supercharge your RAG workflows.",
   "license": "MIT",
   "author": {
