@@ -32,9 +32,12 @@ export class OpenRouter implements INodeType {
 			{
 				displayName: 'Operation',
 				name: 'operation',
-				type: 'options',
-				noDataExpression: true,
-				options: [
+					{
+						name: 'Chat / Generate Text',
+						value: 'message',
+						description: 'Generate text using a language model',
+						action: 'Generate text',
+					},
 					{
 						name: 'Analyze Content (Multimodal & Documents)',
 						value: 'analyze',
@@ -109,7 +112,7 @@ export class OpenRouter implements INodeType {
 				required: true,
 				displayOptions: {
 					show: {
-						operation: ['analyze', 'generateImage', 'generateVideo'],
+						operation: ['message', 'analyze', 'generateImage', 'generateVideo'],
 					},
 				},
 			},
@@ -123,6 +126,18 @@ export class OpenRouter implements INodeType {
 				displayOptions: {
 					show: {
 						operation: ['analyze', 'speechToText'],
+					},
+				},
+			},
+			{
+				displayName: 'System Prompt',
+				name: 'systemPrompt',
+				type: 'string',
+				default: '',
+				description: 'Optional system prompt to guide the model\'s behavior',
+				displayOptions: {
+					show: {
+						operation: ['message'],
 					},
 				},
 			},
@@ -249,7 +264,33 @@ export class OpenRouter implements INodeType {
 				}
 				model = model as string;
 
-				if (operation === 'analyze') {
+				if (operation === 'message') {
+					const prompt = this.getNodeParameter('prompt', i) as string;
+					const systemPrompt = this.getNodeParameter('systemPrompt', i, '') as string;
+					
+					const messages: any[] = [];
+					if (systemPrompt) {
+						messages.push({ role: 'system', content: systemPrompt });
+					}
+					messages.push({ role: 'user', content: prompt });
+
+					const response = await this.helpers.request({
+						method: 'POST',
+						url: 'https://openrouter.ai/api/v1/chat/completions',
+						headers: { ...defaultHeaders, 'Content-Type': 'application/json' },
+						body: {
+							model,
+							messages,
+						},
+						json: true,
+					});
+
+					returnData.push({
+						json: response,
+						pairedItem: { item: i },
+					});
+				}
+				else if (operation === 'analyze') {
 					const prompt = this.getNodeParameter('prompt', i) as string;
 					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
 					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
