@@ -213,10 +213,11 @@ export class OpenRouter implements INodeType {
 				}
 
 				let results = models.map((m: any) => ({
-					name: m.id,
+					name: m.id.startsWith('~') ? m.id.substring(1) : m.id,
 					value: m.id,
-					description: m.name,
 				}));
+
+				results.sort((a: any, b: any) => a.name.localeCompare(b.name));
 
 				if (filter) {
 					const f = filter.toLowerCase();

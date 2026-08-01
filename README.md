@@ -1,4 +1,4 @@
-# n8n-nodes-{{SERVICE_SLUG}}
+# n8n-nodes-openrouter-official
 
 Developed and maintained by **[Jay Nguyen (Nguyễn Thiệu Toàn)](https://nguyenthieutoan.com)**.
 
@@ -9,80 +9,30 @@ Developed and maintained by **[Jay Nguyen (Nguyễn Thiệu Toàn)](https://nguy
 
 ---
 
-{{DESCRIPTION}}
+This is the official community node for OpenRouter in n8n. It allows you to consume OpenRouter's API seamlessly, providing access to a wide array of LLMs, embedding models, and rerankers.
 
 ## Features
 
-* **Feature 1**: Description
-* **Feature 2**: Description
+* **Advanced Chat Models (AI Agent)**: Use any of the hundreds of OpenRouter models within your n8n AI Agent workflows.
+* **Embeddings**: Generate vector embeddings for RAG and semantic search directly via OpenRouter.
+* **Reranking**: Reorder and compress retrieved documents using OpenRouter's reranker models.
+* **Direct API Node**: Call OpenRouter operations (analyze media, text-to-image, etc.) via the standard n8n node interface.
 
 ## Installation
 
 Go to **Settings > Community Nodes** in your n8n instance and install:
 
 ```bash
-n8n-nodes-{{SERVICE_SLUG}}
+n8n-nodes-openrouter-official
 ```
 
 ## Credentials Configuration
 
-1. Get your API Key from the [{{SERVICE_NAME}} Console]({{CREDENTIAL_URL}}).
-2. In n8n, set up a new **{{SERVICE_NAME}} API** credential:
-   * **API Key**: Enter your {{SERVICE_NAME}} API key.
-
-## Usage
-
-Provide clear instructions on how to use the node, including common use cases and parameter configurations.
-
-## Workflow Example
-
-*(Provide a JSON workflow snippet here so users can copy-paste it directly into their n8n canvas)*
-
-<details>
-<summary><b>Click to expand Workflow JSON</b></summary>
-
-```json
-{
-  "nodes": [
-    {
-      "parameters": {},
-      "id": "example-uuid",
-      "name": "When clicking 'Test workflow'",
-      "type": "n8n-nodes-base.manualTrigger",
-      "typeVersion": 1,
-      "position": [0, 0]
-    },
-    {
-      "parameters": {},
-      "id": "example-node-uuid",
-      "name": "{{SERVICE_NAME}}",
-      "type": "n8n-nodes-{{SERVICE_SLUG}}.{{NODE_CLASS_NAME}}",
-      "typeVersion": 1,
-      "position": [220, 0]
-    }
-  ],
-  "connections": {
-    "When clicking 'Test workflow'": {
-      "main": [
-        [
-          {
-            "node": "{{SERVICE_NAME}}",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
-  }
-}
-```
-</details>
-
-## Nodes
-
-| Node | Type | Description |
-|------|------|-------------|
-| {{SERVICE_NAME}} | Regular | {{DESCRIPTION}} |
+1. Get your API Key from the [OpenRouter Console](https://openrouter.ai/keys).
+2. In n8n, set up a new **OpenRouter API** credential:
+   * **API Key**: Enter your OpenRouter API key.
+   * **Site URL (Optional)**: Your application's URL for OpenRouter rankings.
+   * **Site Name (Optional)**: Your application's name.
 
 ## License
 
