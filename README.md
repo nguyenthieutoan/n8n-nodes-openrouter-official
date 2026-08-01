@@ -1,5 +1,7 @@
 # n8n-nodes-openrouter-official
 
+The **Ultimate OpenRouter Toolkit for n8n**. This package solves some of the most critical shortcomings in n8n's native AI capabilities, bringing unprecedented flexibility, power, and cost-efficiency to your workflows.
+
 Developed and maintained by **[Jay Nguyen (Nguyễn Thiệu Toàn)](https://nguyenthieutoan.com)**.
 
 🛡️ **[Verified n8n Creator](https://n8n.io/creators/nguyenthieutoan)** | 💼 CEO/Founder of **[GenStaff](https://genstaff.net)**
@@ -9,16 +11,29 @@ Developed and maintained by **[Jay Nguyen (Nguyễn Thiệu Toàn)](https://nguy
 
 ---
 
-This is the official community node for OpenRouter in n8n. It allows you to consume OpenRouter's API seamlessly, providing access to a wide array of LLMs, embedding models, and rerankers.
+## 🌟 Why is this package a game-changer for n8n?
 
-## Features
+While n8n provides a solid foundation for AI Agent workflows, it has historical limitations when it comes to model variety, embedding flexibility, and advanced RAG (Retrieval-Augmented Generation) strategies like Reranking. **This package fixes all of that.**
 
-* **Advanced Chat Models (AI Agent)**: Use any of the hundreds of OpenRouter models within your n8n AI Agent workflows.
-* **Embeddings**: Generate vector embeddings for RAG and semantic search directly via OpenRouter.
-* **Reranking**: Reorder and compress retrieved documents using OpenRouter's reranker models.
-* **Direct API Node**: Call OpenRouter operations (analyze media, text-to-image, etc.) via the standard n8n node interface.
+By integrating OpenRouter deeply into n8n's standard operations and Advanced AI (LangChain) engine, you unlock three extremely powerful nodes:
 
-## Installation
+### 1. The Core `OpenRouter` Node
+n8n natively requires you to set up separate credentials, billing, and nodes for OpenAI, Anthropic, Google, etc. Furthermore, handling multimodal inputs (like PDFs, audio, video) can be notoriously clunky.
+* **The Solution:** A unified node that connects to **hundreds of models** via a single API key.
+* **Unmatched Multimodal Power:** We've designed this node to easily analyze ANY content—from plain text to complex documents (PDFs), images, audio, and video (provided the selected model, like Gemini 1.5 Pro or Claude 3.5 Sonnet, supports it). 
+* **Beyond Text:** Support for Image Generation, Video Generation, and Audio processing workflows all within one unified interface.
+
+### 2. `EmbeddingsOpenRouter` Node
+n8n's native embedding options are highly restricted (mostly defaulting to OpenAI or a few others).
+* **The Solution:** A massive step forward for RAG setups. This node allows you to use OpenRouter's vast ecosystem to generate vector embeddings. It gives you the freedom to choose the most cost-effective or domain-specific embedding models available on OpenRouter without being locked into OpenAI's ecosystem.
+
+### 3. `RerankerOpenRouter` Node (Document Compressor)
+Retrieval alone often yields irrelevant context, leading to hallucinations. Native n8n severely lacks accessible, high-quality Rerankers (often forcing you to use Cohere).
+* **The Solution:** This node brings OpenRouter into the `Document Compressor` layer of n8n. You can now use any advanced reasoning LLM on OpenRouter to **rerank, score, and compress** your retrieved documents before they reach your final Agent. This drastically increases RAG accuracy and reduces token costs for the final generation step.
+
+---
+
+## 🚀 Installation
 
 Go to **Settings > Community Nodes** in your n8n instance and install:
 
@@ -26,13 +41,23 @@ Go to **Settings > Community Nodes** in your n8n instance and install:
 n8n-nodes-openrouter-official
 ```
 
-## Credentials Configuration
+## ⚙️ Credentials Configuration
 
 1. Get your API Key from the [OpenRouter Console](https://openrouter.ai/keys).
 2. In n8n, set up a new **OpenRouter API** credential:
    * **API Key**: Enter your OpenRouter API key.
    * **Site URL (Optional)**: Your application's URL for OpenRouter rankings.
    * **Site Name (Optional)**: Your application's name.
+
+*(Bonus: You can use the built-in **Test Connection** button in n8n to instantly verify your API key!)*
+
+## 📚 Included Nodes
+
+| Node | Type | Description |
+|------|------|-------------|
+| **OpenRouter** | Standard Action Node | unified gateway to process text, analyze multimodal documents/PDFs/media, and generate images/video. |
+| **OpenRouter Embeddings** | Advanced AI (LangChain) | Generate vector embeddings using any supported OpenRouter model for your Vector Stores. |
+| **OpenRouter Reranker** | Advanced AI (LangChain) | Rerank and compress documents dynamically in RAG workflows to boost context accuracy. |
 
 ## License
 
