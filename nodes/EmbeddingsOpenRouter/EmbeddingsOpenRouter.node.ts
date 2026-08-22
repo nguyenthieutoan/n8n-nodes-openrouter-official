@@ -7,25 +7,52 @@ import {
 	type SupplyData,
 	type INodeListSearchResult,
 } from 'n8n-workflow';
-import { OpenAIEmbeddings } from '@langchain/openai';
-
-/* eslint-disable @typescript-eslint/no-var-requires */
+import type { OpenAIEmbeddings as OpenAIEmbeddingsType } from '@langchain/openai';
+import * as path from 'path';
+import * as fs from 'fs';
 export function requireN8nDependency(dependencyName: string): any {
-	try { return require(dependencyName); } catch (_) {}
-	if (require.main && require.main.paths) {
-		try {
-			const p = require.resolve(dependencyName, { paths: require.main.paths });
-			return require(p);
-		} catch (_) {}
+	try {
+		return require(dependencyName);
+	} catch (_) {}
+
+	const candidates: string[] = [];
+
+	const cwd = process.cwd();
+	candidates.push(cwd);
+
+	if (require.main && require.main.filename) {
+		let current = path.dirname(require.main.filename);
+		while (current && current !== '/' && current !== path.dirname(current)) {
+			candidates.push(current);
+			current = path.dirname(current);
+		}
 	}
+
+	let current = __dirname;
+	while (current && current !== '/' && current !== path.dirname(current)) {
+		candidates.push(current);
+		current = path.dirname(current);
+	}
+
 	try {
 		const workflowResolve = require.resolve('n8n-workflow');
 		const index = workflowResolve.indexOf('node_modules');
 		if (index !== -1) {
-			const base = workflowResolve.substring(0, index + 12);
-			return require(base + '/' + dependencyName);
+			candidates.push(workflowResolve.substring(0, index));
 		}
 	} catch (_) {}
+
+	const uniqueCandidates = [...new Set(candidates)];
+
+	for (const candidate of uniqueCandidates) {
+		const p = path.join(candidate, 'node_modules', dependencyName);
+		try {
+			if (fs.existsSync(p) || fs.existsSync(p + '.js')) {
+				return require(p);
+			}
+		} catch (_) {}
+	}
+
 	throw new Error(`Could not resolve ${dependencyName} from n8n's runtime`);
 }
 
@@ -154,6 +181,7 @@ export class EmbeddingsOpenRouter implements INodeType {
 		}
 		modelName = modelName as string;
 
+		const { OpenAIEmbeddings } = requireN8nDependency('@langchain/openai');
 		const embeddings = new OpenAIEmbeddings({
 			openAIApiKey: credentials.apiKey,
 			modelName,
