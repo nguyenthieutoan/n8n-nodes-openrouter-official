@@ -190,6 +190,7 @@ export class OpenRouterCacheChatModel implements INodeType {
 		],
 		requestDefaults: {
 			ignoreHttpStatusErrors: true,
+			baseURL: 'https://openrouter.ai/api/v1',
 		},
 		properties: [
 			{
