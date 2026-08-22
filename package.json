@@ -33,7 +33,8 @@
     "nodes": [
       "dist/nodes/OpenRouter/OpenRouter.node.js",
       "dist/nodes/EmbeddingsOpenRouter/EmbeddingsOpenRouter.node.js",
-      "dist/nodes/RerankerOpenRouter/RerankerOpenRouter.node.js"
+      "dist/nodes/RerankerOpenRouter/RerankerOpenRouter.node.js",
+      "dist/nodes/OpenRouterCacheChatModel/OpenRouterCacheChatModel.node.js"
     ],
     "credentials": [
       "dist/credentials/OpenRouterCommunityApi.credentials.js"
