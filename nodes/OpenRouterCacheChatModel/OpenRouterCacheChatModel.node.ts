@@ -434,7 +434,7 @@ export class OpenRouterCacheChatModel implements INodeType {
 			fetch: createCachingOpenRouterFetch(globalThis.fetch, cacheConfig),
 		};
 
-		const model = new ChatOpenAI({
+		const modelConfig: any = {
 			apiKey: credentials.apiKey,
 			model: modelName,
 			...options,
@@ -446,10 +446,45 @@ export class OpenRouterCacheChatModel implements INodeType {
 						response_format: { type: options.responseFormat },
 					}
 				: undefined,
-		});
+		};
+
+		const aiUtilities = getAiUtilities();
+		if (aiUtilities && aiUtilities.N8nLlmTracing) {
+			modelConfig.callbacks = [new aiUtilities.N8nLlmTracing(this)];
+		}
+
+		const model = new ChatOpenAI(modelConfig);
 
 		return {
 			response: model,
 		};
+	}
+}
+
+export function requireN8nDependency(dependencyName: string): any {
+	try { return require(dependencyName); } catch (_) {}
+	if (require.main && require.main.paths) {
+		try {
+			const p = require.resolve(dependencyName, { paths: require.main.paths });
+			return require(p);
+		} catch (_) {}
+	}
+	try {
+		const workflowResolve = require.resolve('n8n-workflow');
+		const index = workflowResolve.indexOf('node_modules');
+		if (index !== -1) {
+			const base = workflowResolve.substring(0, index + 12);
+			return require(base + '/' + dependencyName);
+		}
+	} catch (_) {}
+	throw new Error(`Could not resolve ${dependencyName} from n8n's runtime`);
+}
+
+export function getAiUtilities(): any {
+	try {
+		const dep = ['@n8n', 'ai-utilities'].join('/');
+		return requireN8nDependency(dep);
+	} catch (e) {
+		return null;
 	}
 }
