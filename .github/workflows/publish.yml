@@ -1,37 +1,95 @@
-name: Publish Community Node to npmjs
+name: CI & Publish to NPM
 
 on:
-  release:
-    types: [published]
   push:
+    branches:
+      - main
+      - master
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
-  publish-package:
+  build-and-publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      id-token: write # Required to mint ID-token for provenance attestation
+      contents: write   # Allows committing version bumps and creating GitHub Releases
+      id-token: write   # Required for NPM Provenance attestations (n8n 2026 requirement)
+
     steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v6
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          node-version: '24.x'
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
           registry-url: 'https://registry.npmjs.org'
-          package-manager-cache: false
 
-      - name: Install Project Dependencies
-        run: npm install
+      - name: Install dependencies
+        run: npm ci || npm install
 
-      - name: Compile and Transpile TypeScript
+      - name: Run code linter
+        run: npm run lint --if-present
+
+      - name: Build package
         run: npm run build
 
-      - name: Execute Node Linter Verification
-        run: npm run lint
+      - name: Version Resolution & Auto-Bump
+        id: versioning
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          LOCAL_VER=$(node -p "require('./package.json').version")
+          NPM_VER=$(npm view "$PKG_NAME" version 2>/dev/null || echo "none")
+          echo "Package: $PKG_NAME"
+          echo "Local Version: $LOCAL_VER"
+          echo "NPM Published Version: $NPM_VER"
+
+          FINAL_VER="$LOCAL_VER"
+
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_VER=${GITHUB_REF#refs/tags/}
+            TAG_VER=${TAG_VER#v}
+            echo "Publish triggered by Git Tag: v$TAG_VER"
+            FINAL_VER="$TAG_VER"
+            if [ "$LOCAL_VER" != "$TAG_VER" ]; then
+              npm version "$TAG_VER" --no-git-tag-version
+            fi
+          elif [ "$NPM_VER" != "none" ]; then
+            SHOULD_BUMP=$(node -e "
+              const semverCmp = (a, b) => {
+                const pa = a.split('.').map(Number);
+                const pb = b.split('.').map(Number);
+                for (let i = 0; i < 3; i++) {
+                  if ((pa[i]||0) > (pb[i]||0)) return 1;
+                  if ((pa[i]||0) < (pb[i]||0)) return -1;
+                }
+                return 0;
+              };
+              console.log(semverCmp('$LOCAL_VER', '$NPM_VER') <= 0 ? 'true' : 'false');
+            ")
+
+            if [ "$SHOULD_BUMP" = "true" ]; then
+              echo "Local version ($LOCAL_VER) <= NPM version ($NPM_VER). Automatically bumping patch version..."
+              npm version patch --no-git-tag-version
+              FINAL_VER=$(node -p "require('./package.json').version")
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git commit -am "chore(release): v$FINAL_VER [skip ci]"
+              git push origin HEAD:${{ github.ref_name }}
+              git tag -a "v$FINAL_VER" -m "Release v$FINAL_VER"
+              git push origin "v$FINAL_VER"
+              echo "Bumped and tagged v$FINAL_VER"
+            fi
+          fi
+
+          echo "final_version=$FINAL_VER" >> $GITHUB_OUTPUT
+
+      - name: Rebuild with final version if bumped
+        run: npm run build
 
       - name: Publish to NPM with Provenance
         run: npm publish --provenance --access public
@@ -40,10 +98,10 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || steps.versioning.outputs.final_version != ''
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: v${{ steps.versioning.outputs.final_version }}
+          name: Release v${{ steps.versioning.outputs.final_version }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
