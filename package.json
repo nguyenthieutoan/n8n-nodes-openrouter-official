@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-openrouter-official",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "The Ultimate OpenRouter Toolkit for n8n. Includes a Multimodal Action Node, Vector Embeddings, Advanced Reranker, Prompt Cache Chat Model, and System One Decisions (Jev) to supercharge your AI workflows.",
   "license": "MIT",
   "author": {

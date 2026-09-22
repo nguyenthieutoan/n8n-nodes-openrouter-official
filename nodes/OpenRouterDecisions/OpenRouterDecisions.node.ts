@@ -10,7 +10,7 @@ export class OpenRouterDecisions implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'OpenRouter Decisions (System One)',
 		name: 'openRouterDecisions',
-		icon: { light: 'file:openrouter-decisions.svg', dark: 'file:openrouter-decisions.dark.svg' },
+		icon: { light: 'file:openrouter.svg', dark: 'file:openrouter.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["modelSelect"] === "custom" ? $parameter["customModel"] : $parameter["modelSelect"]}}',
