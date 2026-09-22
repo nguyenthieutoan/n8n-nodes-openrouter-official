@@ -20,6 +20,9 @@
     "n8n-community-node-package"
   ],
   "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc && gulp build:icons",
     "dev": "tsc --watch",

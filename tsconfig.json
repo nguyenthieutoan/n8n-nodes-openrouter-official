@@ -20,5 +20,11 @@
     "nodes/**/*",
     "credentials/**/*",
     "index.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "tests/**/*"
   ]
 }
