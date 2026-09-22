@@ -92,7 +92,20 @@ jobs:
         run: npm run build
 
       - name: Publish to NPM with Provenance
-        run: npm publish --provenance --access public || npm publish --access public
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          FINAL_VER="${{ steps.versioning.outputs.final_version }}"
+          if [ -z "$FINAL_VER" ]; then
+            FINAL_VER=$(node -p "require('./package.json').version")
+          fi
+          ALREADY_PUBLISHED=$(npm view "$PKG_NAME@$FINAL_VER" version 2>/dev/null || echo "none")
+
+          if [ "$ALREADY_PUBLISHED" = "$FINAL_VER" ]; then
+            echo "✅ Version $FINAL_VER is already published on NPM. Skipping publish step."
+          else
+            echo "🚀 Publishing version $FINAL_VER to NPM..."
+            npm publish --provenance --access public || npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
