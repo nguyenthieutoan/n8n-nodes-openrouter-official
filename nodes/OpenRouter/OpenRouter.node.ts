@@ -6,7 +6,101 @@ import {
 	ILoadOptionsFunctions,
 	INodePropertyOptions,
 	INodeListSearchResult,
+	NodeOperationError,
 } from 'n8n-workflow';
+
+export function extractImageUrls(input: any): string[] {
+	if (!input) return [];
+
+	if (Array.isArray(input)) {
+		return input
+			.map((item) => extractImageUrls(item))
+			.reduce((acc: string[], val: string[]) => acc.concat(val), [])
+			.filter(Boolean);
+	}
+
+	if (typeof input !== 'string') {
+		input = String(input);
+	}
+
+	// Remove brackets [], quotes '', "", and backticks ``
+	const cleaned = input.replace(/[\[\]"'\`]/g, ' ');
+
+	// Split by comma or newline
+	return cleaned
+		.split(/[\r\n,]+/)
+		.map((u: string) => u.trim())
+		.filter((u: string) => u.length > 0);
+}
+
+export function buildMediaContent(binaryData: any, binaryDataBuffer: Buffer, fileName?: string): any {
+	const mimeType = (binaryData?.mimeType || '').toLowerCase();
+	const ext = (binaryData?.fileExtension || '').toLowerCase();
+	const base64Data = binaryDataBuffer.toString('base64');
+
+	// 1. Audio files (audio/mpeg, audio/wav, audio/ogg, audio/mp4, audio/aac, audio/webm, etc.)
+	if (
+		mimeType.startsWith('audio/') ||
+		['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'weba'].includes(ext)
+	) {
+		const format = mimeType.includes('wav') || ext === 'wav' ? 'wav' : 'mp3';
+		return {
+			type: 'input_audio',
+			input_audio: {
+				data: base64Data,
+				format,
+			},
+		};
+	}
+
+	// 2. Text / Code / CSV / JSON files -> Inject directly as text content
+	if (
+		mimeType.startsWith('text/') ||
+		mimeType === 'application/json' ||
+		mimeType === 'text/csv' ||
+		['txt', 'csv', 'md', 'markdown', 'json', 'xml', 'log', 'yaml', 'yml'].includes(ext)
+	) {
+		const textContent = binaryDataBuffer.toString('utf-8');
+		const label = fileName ? `Document (${fileName})` : 'Document';
+		return {
+			type: 'text',
+			text: `\n--- Attached ${label} ---\n${textContent}\n--- End ${label} ---\n`,
+		};
+	}
+
+	// 3. PDF Documents -> Standard data URI
+	if (mimeType === 'application/pdf' || ext === 'pdf') {
+		return {
+			type: 'image_url',
+			image_url: {
+				url: `data:application/pdf;base64,${base64Data}`,
+			},
+		};
+	}
+
+	// 4. Video files -> data URI for multimodal video models (e.g. Gemini)
+	if (
+		mimeType.startsWith('video/') ||
+		['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext)
+	) {
+		const videoMime = mimeType || (ext === 'webm' ? 'video/webm' : 'video/mp4');
+		return {
+			type: 'image_url',
+			image_url: {
+				url: `data:${videoMime};base64,${base64Data}`,
+			},
+		};
+	}
+
+	// 5. Default: Image files (image/jpeg, image/png, image/webp, image/gif, etc.)
+	const imageMime = mimeType.startsWith('image/') ? mimeType : 'image/jpeg';
+	return {
+		type: 'image_url',
+		image_url: {
+			url: `data:${imageMime};base64,${base64Data}`,
+		},
+	};
+}
 
 export class OpenRouter implements INodeType {
 	description: INodeTypeDescription = {
@@ -120,15 +214,78 @@ export class OpenRouter implements INodeType {
 				},
 			},
 			{
+				displayName: 'Media Source',
+				name: 'mediaSource',
+				type: 'options',
+				options: [
+					{
+						name: 'Binary Data',
+						value: 'binary',
+						description: 'Analyze binary file(s) from incoming items (Images, Audio, PDF, Video, Text)',
+					},
+					{
+						name: 'Media / Image URLs',
+						value: 'urls',
+						description: 'Analyze media from a comma-separated list of URLs (Images, Audio)',
+					},
+					{
+						name: 'Both (Binary & URLs)',
+						value: 'both',
+						description: 'Combine both binary files and media URLs',
+					},
+				],
+				default: 'binary',
+				description: 'Choose where the media content comes from',
+				displayOptions: {
+					show: {
+						operation: ['analyze'],
+					},
+				},
+			},
+			{
+				displayName: 'Include All Binaries',
+				name: 'allBinaries',
+				type: 'boolean',
+				default: false,
+				description: 'Whether to process all binary properties present in the input item',
+				displayOptions: {
+					show: {
+						operation: ['analyze'],
+						mediaSource: ['binary', 'both'],
+					},
+				},
+			},
+			{
 				displayName: 'Binary Property',
 				name: 'binaryPropertyName',
 				type: 'string',
 				default: 'data',
 				required: true,
-				description: 'Name of the binary property containing the file to process',
+				description: 'Name of the binary property (or comma-separated list of properties, e.g. data1, data2) containing the file(s) to process',
 				displayOptions: {
 					show: {
 						operation: ['analyze', 'speechToText'],
+					},
+					hide: {
+						mediaSource: ['urls'],
+						allBinaries: [true],
+					},
+				},
+			},
+			{
+				displayName: 'Media / Image URLs',
+				name: 'imageUrls',
+				type: 'string',
+				typeOptions: {
+					rows: 3,
+				},
+				default: '',
+				placeholder: 'https://example.com/image1.jpg, https://example.com/audio.mp3',
+				description: 'Comma-separated list of media or image URLs. Automatically strips brackets, quotes, and extra whitespace.',
+				displayOptions: {
+					show: {
+						operation: ['analyze'],
+						mediaSource: ['urls', 'both'],
 					},
 				},
 			},
@@ -295,18 +452,73 @@ export class OpenRouter implements INodeType {
 				}
 				else if (operation === 'analyze') {
 					const prompt = this.getNodeParameter('prompt', i) as string;
-					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
-					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-					const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-					
-					const base64Data = binaryDataBuffer.toString('base64');
-					const mimeType = binaryData.mimeType;
-					
-					// Assuming generic image_url type works for multimodal
-					const content: any[] = [
-						{ type: 'text', text: prompt },
-						{ type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } }
-					];
+					const mediaSource = this.getNodeParameter('mediaSource', i, 'binary') as string;
+					const content: any[] = [{ type: 'text', text: prompt }];
+
+					// Process Binary Data
+					if (mediaSource === 'binary' || mediaSource === 'both') {
+						const allBinaries = this.getNodeParameter('allBinaries', i, false) as boolean;
+						const itemBinary = items[i].binary;
+
+						if (allBinaries) {
+							if (itemBinary) {
+								for (const key of Object.keys(itemBinary)) {
+									const binaryData = itemBinary[key];
+									const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(i, key);
+									content.push(buildMediaContent(binaryData, binaryDataBuffer, binaryData.fileName || key));
+								}
+							}
+						} else {
+							const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i, 'data') as string;
+							const keys = binaryPropertyName.split(',').map((k) => k.trim()).filter(Boolean);
+							for (const key of keys) {
+								const binaryData = this.helpers.assertBinaryData(i, key);
+								const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(i, key);
+								content.push(buildMediaContent(binaryData, binaryDataBuffer, binaryData.fileName || key));
+							}
+						}
+					}
+
+					// Process Image / Media URLs
+					if (mediaSource === 'urls' || mediaSource === 'both') {
+						const rawImageUrls = this.getNodeParameter('imageUrls', i, '') as any;
+						const urls = extractImageUrls(rawImageUrls);
+						for (const url of urls) {
+							// If URL clearly points to audio, convert to base64 input_audio since Chat Completions requires base64 for audio
+							if (/\.(mp3|wav|ogg|m4a|aac|flac)(\?.*)?$/i.test(url)) {
+								try {
+									const audioBuffer = await this.helpers.request({
+										method: 'GET',
+										url,
+										encoding: null,
+									});
+									const format = /\.wav(\?.*)?$/i.test(url) ? 'wav' : 'mp3';
+									content.push({
+										type: 'input_audio',
+										input_audio: {
+											data: audioBuffer.toString('base64'),
+											format,
+										},
+									});
+									continue;
+								} catch (_) {
+									// Fallback to image_url
+								}
+							}
+							content.push({
+								type: 'image_url',
+								image_url: { url },
+							});
+						}
+					}
+
+					if (content.length <= 1) {
+						throw new NodeOperationError(
+							this.getNode(),
+							'No valid binary files or media URLs were found to analyze. Please provide at least one media or binary file.',
+							{ itemIndex: i },
+						);
+					}
 
 					const response = await this.helpers.request({
 						method: 'POST',

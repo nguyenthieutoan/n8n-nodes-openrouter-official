@@ -20,7 +20,7 @@ By integrating OpenRouter deeply into n8n's standard operations and Advanced AI 
 ### 1. The Core `OpenRouter` Node
 n8n natively requires you to set up separate credentials, billing, and nodes for OpenAI, Anthropic, Google, etc. Furthermore, handling multimodal inputs (like PDFs, audio, video) can be notoriously clunky.
 * **The Solution:** A unified node that connects to **hundreds of models** via a single API key.
-* **Unmatched Multimodal Power:** We've designed this node to easily analyze ANY content—from plain text to complex documents (PDFs), images, audio, and video (provided the selected model, like Gemini or Claude, supports it). 
+* **Unmatched Multimodal Power:** We've designed this node to easily analyze ANY content—from plain text to complex documents (PDFs), images, audio, and video (provided the selected model, like Gemini or Claude, supports it). Seamlessly supports processing all incoming binary files at once (**Include All Binaries**), comma-separated binary properties, or comma-separated lists of **Image URLs** with automatic bracket/quote/whitespace sanitization. 
 * **Beyond Text:** Support for Image Generation, Video Generation, and Audio processing workflows all within one unified interface.
 
 ### 2. `EmbeddingsOpenRouter` Node
