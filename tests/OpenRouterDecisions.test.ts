@@ -350,4 +350,57 @@ describe('OpenRouterDecisions Node', () => {
 			statusCode: 402,
 		});
 	});
+
+	it('should automatically infer criteria for noul when criteriaTrue and criteriaFalse are omitted', async () => {
+		const mockExec = createMockExecuteFunctions();
+
+		mockExec.getNodeParameter.mockImplementation((paramName: string) => {
+			if (paramName === 'modelSelect') return 'typesafe/jev-1.13';
+			if (paramName === 'stateMode') return 'currentItem';
+			if (paramName === 'questionMode') return 'builder';
+			if (paramName === 'questionsBuilder') {
+				return {
+					question: [
+						{
+							name: 'is_urgent',
+							type: 'noul',
+							instructions: 'Is this message urgent?',
+						},
+					],
+				};
+			}
+			if (paramName === 'options') return { simplify: true };
+			return undefined;
+		});
+
+		(mockExec.helpers.request as jest.Mock).mockResolvedValue({
+			id: 'test-noul-fallback',
+			answers: {
+				is_urgent: { type: 'noul', noul: 0.88 },
+			},
+		});
+
+		const result = await node.execute.call(mockExec);
+		const outJson = result[0][0].json as Record<string, any>;
+		expect(outJson.decision.is_urgent).toBe(0.88);
+		expect(outJson.verdict.is_urgent).toBe(true);
+
+		expect(mockExec.helpers.request).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: expect.objectContaining({
+					questions: {
+						is_urgent: {
+							type: 'noul',
+							instructions: 'Is this message urgent?',
+							criteria: {
+								true: 'The condition is met: "Is this message urgent?"',
+								false: 'The condition is not met: "Is this message urgent?"',
+							},
+						},
+					},
+				}),
+			}),
+		);
+	});
 });
+

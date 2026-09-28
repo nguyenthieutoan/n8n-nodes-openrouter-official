@@ -81,7 +81,23 @@ n8n-nodes-openrouter-official
 | **OpenRouter Reranker** | Advanced AI (LangChain) | Rerank and compress documents dynamically in RAG workflows to boost context accuracy. |
 | **OpenRouter Cache Chat Model** | Advanced AI (LangChain) | Chat model with prompt caching support to cut token costs and reduce latency. |
 
+## 🎯 OpenRouter Decisions (System One) — Rapid Probabilistic Decisions
+
+The **OpenRouter Decisions** node integrates OpenRouter's native Decisions API powered by TypeSafe Jev (System One). Unlike standard LLMs that generate conversational prose or unpredictable markdown JSON blocks, System One models make **instant, typed, and mathematically calibrated decisions** with zero output token latency and **100% free output tokens** (billed only on input tokens).
+
+### 💡 The 3 Decision Types (Primitives):
+1. **Yes / No (Boolean - Noul)**: Evaluates whether a condition holds true. Returns a calibrated probability from `0.0` (Definite No) to `1.0` (Definite Yes). A score of `0.5` represents maximum ambiguity (50/50 uncertainty).
+2. **Choice (Classification)**: Picks the single best option from predefined categories. Returns the winning key, confidence score, and full probability distribution.
+3. **Score (Ordered Scale)**: Places input onto an ordered scale (e.g. Low, Medium, High urgency) and returns a probability-weighted continuous score.
+
+### ⚡ Downstream Workflow Integration:
+When **Simplify Output** is enabled (default), decisions are automatically flattened directly to the root for instant conditional branching in n8n:
+- **IF Node**: Use `{{ $json.verdict.is_urgent }}` (boolean `true`/`false`) or `{{ $json.decision.is_urgent >= 0.8 }}`.
+- **Switch Node**: Use `{{ $json.decision.category }}` to route between teams (e.g. `support`, `billing`, `sales`).
+- **Human Review**: When **Flag Ambiguity** is enabled, route edge cases where `{{ $json.isAmbiguous }}` is `true` directly to human operators.
+
 ## License
 
 [MIT](LICENSE)
+
 

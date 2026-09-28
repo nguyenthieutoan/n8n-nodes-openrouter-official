@@ -142,7 +142,7 @@ export class OpenRouterDecisions implements INodeType {
 				displayName: 'State JSON',
 				name: 'stateJson',
 				type: 'json',
-				default: '{\n  "ticket": "My checkout page shows a blank screen after I click Pay.",\n  "tier": "enterprise"\n}',
+				default: '{\n  "message": "Enter content to evaluate or map variables like {{$json.text}}"\n}',
 				description: 'JSON object representing the application state to evaluate',
 				displayOptions: {
 					show: {
@@ -218,39 +218,39 @@ export class OpenRouterDecisions implements INodeType {
 								required: true,
 							},
 							{
-								displayName: 'Primitive Type',
+								displayName: 'Decision Type',
 								name: 'type',
 								type: 'options',
 								options: [
 									{
-										name: 'Noul (Boolean Yes/No Evaluation)',
+										name: 'Yes / No (Boolean - Noul)',
 										value: 'noul',
-										description: 'Evaluates whether a condition holds true (returns probability 0.0 to 1.0)',
+										description: 'Evaluate whether a condition is True or False (returns probability 0.0 to 1.0, where >= 0.5 is Yes)',
 									},
 									{
-										name: 'Choice (Pick 1 from Alternatives)',
+										name: 'Choice (Classification - Pick 1 from List)',
 										value: 'choice',
-										description: 'Picks one winning option with confidence and probability distribution',
+										description: 'Pick exactly 1 winning category from custom options with confidence scores',
 									},
 									{
-										name: 'Score (Ordered Scale Ranking)',
+										name: 'Score (Ordered Scale - e.g. Priority/Urgency)',
 										value: 'score',
-										description: 'Places input on an ordered discrete scale (returns probability-weighted continuous float)',
+										description: 'Rank input on an ordered spectrum (e.g. Low to Critical) and compute a continuous weighted score',
 									},
 								],
 								default: 'noul',
 								description: 'The mathematical decision primitive to apply',
 							},
 							{
-								displayName: 'Instructions',
+								displayName: 'Question / Instructions',
 								name: 'instructions',
 								type: 'string',
 								typeOptions: {
 									rows: 2,
 								},
 								default: '',
-								placeholder: 'Is the customer reporting a software defect?',
-								description: 'The question prompt and context guidance for the model',
+								placeholder: 'e.g. Does this customer inquiry require urgent escalation to a human agent?',
+								description: 'The clear question, statement, or condition for the model to evaluate',
 								required: true,
 							},
 							// Noul Criteria
@@ -258,27 +258,27 @@ export class OpenRouterDecisions implements INodeType {
 								displayName: 'Criterion for TRUE (Yes)',
 								name: 'criteriaTrue',
 								type: 'string',
-								default: 'The customer describes broken or unexpected product behavior.',
-								description: 'Definition of what constitutes a positive/true answer',
+								default: '',
+								placeholder: 'e.g. The customer expresses anger, critical urgency, or requests a refund (Optional)',
+								description: 'Explicit definition of when condition is TRUE. If left empty, automatically inferred from Instructions.',
 								displayOptions: {
 									show: {
 										type: ['noul'],
 									},
 								},
-								required: true,
 							},
 							{
 								displayName: 'Criterion for FALSE (No)',
 								name: 'criteriaFalse',
 								type: 'string',
-								default: 'The customer is asking a question or requesting a feature.',
-								description: 'Definition of what constitutes a negative/false answer',
+								default: '',
+								placeholder: 'e.g. Standard question, feature request, or normal inquiry (Optional)',
+								description: 'Explicit definition of when condition is FALSE. If left empty, automatically inferred from Instructions.',
 								displayOptions: {
 									show: {
 										type: ['noul'],
 									},
 								},
-								required: true,
 							},
 							// Choice Criteria
 							{
@@ -305,17 +305,17 @@ export class OpenRouterDecisions implements INodeType {
 												name: 'key',
 												type: 'string',
 												default: '',
-												placeholder: 'payments',
-												description: 'Key identifier returned if this option is selected',
+												placeholder: 'support',
+												description: 'Key identifier returned if this option wins (e.g. sales, support, billing)',
 												required: true,
 											},
 											{
-												displayName: 'Criterion Description',
+												displayName: 'When to Choose (Description)',
 												name: 'description',
 												type: 'string',
 												default: '',
-												placeholder: 'Checkout, billing, or payment processing issues.',
-												description: 'Definition of when this option should be selected',
+												placeholder: 'e.g. Inquiries regarding technical bugs, error codes, or app crashes',
+												description: 'Definition of conditions under which this option should be selected',
 												required: true,
 											},
 										],
@@ -343,12 +343,12 @@ export class OpenRouterDecisions implements INodeType {
 										displayName: 'Scale Level',
 										values: [
 											{
-												displayName: 'Criterion Description',
+												displayName: 'Level Description',
 												name: 'description',
 												type: 'string',
 												default: '',
-												placeholder: 'Can wait for the next release',
-												description: 'Description of this level in the ordered scale',
+												placeholder: 'e.g. Low - can wait for the next release cycle',
+												description: 'Description of this level in the ordered scale (from index 0 to N-1)',
 												required: true,
 											},
 										],
@@ -386,14 +386,14 @@ export class OpenRouterDecisions implements INodeType {
 						name: 'simplify',
 						type: 'boolean',
 						default: true,
-						description: 'Whether to expose typed decision values at the root of the output JSON for instant downstream branching in If and Switch nodes',
+						description: 'Whether to expose typed decision values ($json.decision, $json.verdict, $json.confidence) at the root level for easy use in If and Switch nodes. Defaults to true.',
 					},
 					{
 						displayName: 'Flag Ambiguity',
 						name: 'flagAmbiguity',
 						type: 'boolean',
 						default: false,
-						description: 'Whether to automatically flag ambiguous decisions when confidence is low or boolean probability is near 0.5',
+						description: 'Whether to automatically flag uncertain decisions when confidence is low or probability is close to 0.5 (returns isAmbiguous: true)',
 					},
 					{
 						displayName: 'Ambiguity Confidence Threshold',
@@ -405,7 +405,7 @@ export class OpenRouterDecisions implements INodeType {
 							numberStepSize: 0.05,
 						},
 						default: 0.6,
-						description: 'Confidence score below which a decision is marked as ambiguous (or noul probability near 0.5)',
+						description: 'Confidence score (0.10 to 0.99) below which a decision is marked as ambiguous. Default is 0.60.',
 						displayOptions: {
 							show: {
 								flagAmbiguity: [true],
@@ -417,31 +417,31 @@ export class OpenRouterDecisions implements INodeType {
 						name: 'allowFallbacks',
 						type: 'boolean',
 						default: true,
-						description: 'Whether OpenRouter may route to fallback providers if the primary provider encounters an error',
+						description: 'Whether OpenRouter may automatically route to fallback providers if the primary provider encounters an outage or rate limit',
 					},
 					{
 						displayName: 'Session ID',
 						name: 'sessionId',
 						type: 'string',
 						default: '',
-						placeholder: 'session-1234',
-						description: 'A unique identifier for grouping related requests in OpenRouter Broadcast and private logging (max 256 chars)',
+						placeholder: 'e.g. user-session-1234',
+						description: 'A unique identifier for grouping related requests in OpenRouter Broadcast and private logs (max 256 chars)',
 					},
 					{
 						displayName: 'Trace ID',
 						name: 'traceId',
 						type: 'string',
 						default: '',
-						placeholder: 'trace-abc123',
-						description: 'Trace identifier for observability pipelines',
+						placeholder: 'e.g. trace-abc123',
+						description: 'Observability trace identifier passed to OpenRouter traces (or Langfuse/Helicone)',
 					},
 					{
 						displayName: 'Trace Name',
 						name: 'traceName',
 						type: 'string',
 						default: '',
-						placeholder: 'ticket-routing-pipeline',
-						description: 'Trace name for observability pipelines',
+						placeholder: 'e.g. ticket-routing-pipeline',
+						description: 'Human-readable pipeline name for grouping traces in OpenRouter dashboard',
 					},
 					{
 						displayName: 'Custom Site URL (HTTP-Referer)',
@@ -449,7 +449,7 @@ export class OpenRouterDecisions implements INodeType {
 						type: 'string',
 						default: '',
 						placeholder: 'https://mycompany.com',
-						description: 'Override HTTP-Referer header for app attribution on OpenRouter',
+						description: 'Your app website URL sent via HTTP-Referer header for app attribution on OpenRouter',
 					},
 					{
 						displayName: 'Custom App Title (X-Title)',
@@ -457,7 +457,7 @@ export class OpenRouterDecisions implements INodeType {
 						type: 'string',
 						default: '',
 						placeholder: 'Support Ticket Router',
-						description: 'Override X-Title header for app attribution on OpenRouter',
+						description: 'Your application name sent via X-Title header for app attribution on OpenRouter',
 					},
 				],
 			},
@@ -586,12 +586,14 @@ export class OpenRouterDecisions implements INodeType {
 						}
 
 						if (q.type === 'noul') {
+							const trueCriterion = (q.criteriaTrue || '').trim() || `The condition is met: "${qInstructions}"`;
+							const falseCriterion = (q.criteriaFalse || '').trim() || `The condition is not met: "${qInstructions}"`;
 							questions[qName] = {
 								type: 'noul',
 								instructions: qInstructions,
 								criteria: {
-									true: q.criteriaTrue || 'True condition holds.',
-									false: q.criteriaFalse || 'False condition holds.',
+									true: trueCriterion,
+									false: falseCriterion,
 								},
 							};
 						} else if (q.type === 'choice') {

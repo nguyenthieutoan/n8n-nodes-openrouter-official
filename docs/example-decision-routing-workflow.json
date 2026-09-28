@@ -1,0 +1,603 @@
+{
+  "name": "OpenRouter Decisions - Enterprise Ticket & Sentiment Router",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e0000000-0000-0000-0000-000000000001",
+      "name": "1. Khi Nhận Tin Nhắn Mới (Mock Webhook)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mock-ticket-01",
+              "name": "customer_name",
+              "value": "Nguyễn Văn Hùng",
+              "type": "string"
+            },
+            {
+              "id": "mock-ticket-02",
+              "name": "customer_phone",
+              "value": "0912345678",
+              "type": "string"
+            },
+            {
+              "id": "mock-ticket-03",
+              "name": "customer_tier",
+              "value": "VIP Enterprise",
+              "type": "string"
+            },
+            {
+              "id": "mock-ticket-04",
+              "name": "message_text",
+              "value": "App bên bạn bị lỗi gì thế? Tôi thanh toán gói năm bị trừ tiền 2 lần trong thẻ tín dụng mà tài khoản vẫn báo hết hạn! Yêu cầu hoàn tiền ngay hoặc gọi cho tôi xử lý gấp, làm ăn tắc trách quá!",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000002",
+      "name": "2. Dữ Liệu Khách Hàng (Input Payload)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "modelSelect": "typesafe/jev-1.13",
+        "stateMode": "currentItem",
+        "questionMode": "builder",
+        "questionsBuilder": {
+          "question": [
+            {
+              "name": "is_churn_risk",
+              "type": "noul",
+              "instructions": "Khách hàng có đang cực kỳ bức xúc, thất vọng hoặc có nguy cơ hủy dịch vụ/rời bỏ không?",
+              "criteriaTrue": "",
+              "criteriaFalse": ""
+            },
+            {
+              "name": "needs_immediate_hotline",
+              "type": "noul",
+              "instructions": "Vấn đề này có cần nhân viên gọi điện trực tiếp hỗ trợ khẩn cấp ngay lập tức không?",
+              "criteriaTrue": "",
+              "criteriaFalse": ""
+            },
+            {
+              "name": "department",
+              "type": "choice",
+              "instructions": "Yêu cầu này thuộc phạm vi xử lý của phòng ban chuyên môn nào nhất?",
+              "choiceOptions": {
+                "option": [
+                  {
+                    "key": "billing",
+                    "description": "Vấn đề liên quan tới trừ tiền, thanh toán, lỗi cổng thanh toán, hóa đơn hoặc hoàn tiền."
+                  },
+                  {
+                    "key": "tech_support",
+                    "description": "Lỗi phần mềm, bug, sập ứng dụng, không tải được trang hoặc sự cố kỹ thuật."
+                  },
+                  {
+                    "key": "sales",
+                    "description": "Hỏi giá cả, tư vấn gói cước, mua thêm tài khoản hoặc nâng cấp gói mới."
+                  },
+                  {
+                    "key": "general",
+                    "description": "Câu hỏi thông tin chung, góp ý bình thường không mang tính lỗi kỹ thuật."
+                  }
+                ]
+              }
+            },
+            {
+              "name": "urgency_score",
+              "type": "score",
+              "instructions": "Đánh giá mức độ khẩn cấp tổng thể của sự cố trên thang đo 3 cấp độ để kích hoạt SLA.",
+              "scoreLevels": {
+                "level": [
+                  {
+                    "description": "Mức 0 (Thấp): Thắc mắc thông thường, không ảnh hưởng vận hành, SLA 24h."
+                  },
+                  {
+                    "description": "Mức 1 (Trung bình): Khách hàng bị gián đoạn tính năng phụ hoặc cần xử lý trong ngày, SLA 4h."
+                  },
+                  {
+                    "description": "Mức 2 (Khẩn cấp cao): Sự cố trừ tiền, lỗi dịch vụ cốt lõi, khách hàng VIP đang giận dữ, SLA 15 phút."
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "simplify": true,
+          "flagAmbiguity": true,
+          "ambiguityThreshold": 0.6,
+          "allowFallbacks": true,
+          "traceName": "customer-ticket-routing"
+        }
+      },
+      "id": "e0000000-0000-0000-0000-000000000003",
+      "name": "3. OpenRouter Decisions (System One AI)",
+      "type": "openRouterDecisions",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "openRouterCommunityApi": {
+          "id": "openrouter-credential-id",
+          "name": "OpenRouter API account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-ambiguity",
+              "leftValue": "={{ $json.isAmbiguous }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000004",
+      "name": "4. Kiểm Tra Độ Mơ Hồ (Human-in-the-Loop)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "alert-ambiguity",
+              "name": "action",
+              "value": "Chuyển giao người kiểm duyệt (Human Review Required)",
+              "type": "string"
+            },
+            {
+              "id": "alert-reason",
+              "name": "reasons",
+              "value": "={{ $json.ambiguityReasons }}",
+              "type": "array"
+            },
+            {
+              "id": "alert-raw-input",
+              "name": "customer_message",
+              "value": "={{ $('2. Dữ Liệu Khách Hàng (Input Payload)').item.json.message_text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000005",
+      "name": "4a. Cảnh Báo: AI Lưỡng Lự (Cần Người Duyệt)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1220,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-hotline",
+              "leftValue": "={{ $json.verdict.needs_immediate_hotline }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000006",
+      "name": "5. Khách Cần Hotline Ngay (Noul)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1220,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "hotline-01",
+              "name": "ALERT_TYPE",
+              "value": "🚨 BÁO ĐỘNG ĐỎ: KHÁCH HÀNG VIP BỨC XÚC CẦN GỌI ĐIỆN NGAY",
+              "type": "string"
+            },
+            {
+              "id": "hotline-02",
+              "name": "customer_phone",
+              "value": "={{ $('2. Dữ Liệu Khách Hàng (Input Payload)').item.json.customer_phone }}",
+              "type": "string"
+            },
+            {
+              "id": "hotline-03",
+              "name": "urgency_score",
+              "value": "={{ $json.decision.urgency_score }}",
+              "type": "number"
+            },
+            {
+              "id": "hotline-04",
+              "name": "churn_risk_probability",
+              "value": "={{ $json.decision.is_churn_risk }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000007",
+      "name": "5a. Bắn Hotline / SMS Cho Trưởng Bộ Phận",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1500,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision.department }}",
+                    "rightValue": "billing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "Billing"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision.department }}",
+                    "rightValue": "tech_support",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "Tech Support"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision.department }}",
+                    "rightValue": "sales",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "Sales"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "e0000000-0000-0000-0000-000000000008",
+      "name": "6. Phân Tuyến Phòng Ban (Choice)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1500,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticket-billing-01",
+              "name": "assigned_team",
+              "value": "Đội Kế toán & Cổng thanh toán",
+              "type": "string"
+            },
+            {
+              "id": "ticket-billing-02",
+              "name": "task_action",
+              "value": "Kiểm tra log giao dịch trùng lặp và làm lệnh hoàn tiền cho khách",
+              "type": "string"
+            },
+            {
+              "id": "ticket-billing-03",
+              "name": "SLA_hours",
+              "value": "={{ $json.decision.urgency_score >= 1.5 ? 0.25 : 2 }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000009",
+      "name": "Nhánh 1: Xử Lý Kế Toán & Hoàn Tiền",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1820,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticket-tech-01",
+              "name": "assigned_team",
+              "value": "Đội Kỹ thuật & DevOps",
+              "type": "string"
+            },
+            {
+              "id": "ticket-tech-02",
+              "name": "task_action",
+              "value": "Kiểm tra webhook thanh toán và cập nhật lại trạng thái tài khoản active",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000010",
+      "name": "Nhánh 2: Xử Lý Kỹ Thuật (DevOps)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1820,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticket-sales-01",
+              "name": "assigned_team",
+              "value": "Đội Kinh doanh & Chăm sóc khách hàng",
+              "type": "string"
+            },
+            {
+              "id": "ticket-sales-02",
+              "name": "task_action",
+              "value": "Tư vấn nâng cấp gói hoặc gia hạn chương trình ưu đãi",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000011",
+      "name": "Nhánh 3: Chăm Sóc Khách Hàng / Sales",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1820,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ticket-general-01",
+              "name": "assigned_team",
+              "value": "Hòm thư chung tiếp nhận thông tin",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e0000000-0000-0000-0000-000000000012",
+      "name": "Nhánh 4: Yêu Cầu Chung",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1820,
+        820
+      ]
+    }
+  ],
+  "connections": {
+    "1. Khi Nhận Tin Nhắn Mới (Mock Webhook)": {
+      "main": [
+        [
+          {
+            "node": "2. Dữ Liệu Khách Hàng (Input Payload)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Dữ Liệu Khách Hàng (Input Payload)": {
+      "main": [
+        [
+          {
+            "node": "3. OpenRouter Decisions (System One AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. OpenRouter Decisions (System One AI)": {
+      "main": [
+        [
+          {
+            "node": "4. Kiểm Tra Độ Mơ Hồ (Human-in-the-Loop)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Kiểm Tra Độ Mơ Hồ (Human-in-the-Loop)?": {
+      "main": [
+        [
+          {
+            "node": "4a. Cảnh Báo: AI Lưỡng Lự (Cần Người Duyệt)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "5. Khách Cần Hotline Ngay (Noul)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Khách Cần Hotline Ngay (Noul)?": {
+      "main": [
+        [
+          {
+            "node": "5a. Bắn Hotline / SMS Cho Trưởng Bộ Phận",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "6. Phân Tuyến Phòng Ban (Choice)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "6. Phân Tuyến Phòng Ban (Choice)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Phân Tuyến Phòng Ban (Choice)": {
+      "main": [
+        [
+          {
+            "node": "Nhánh 1: Xử Lý Kế Toán & Hoàn Tiền",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nhánh 2: Xử Lý Kỹ Thuật (DevOps)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nhánh 3: Chăm Sóc Khách Hàng / Sales",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Nhánh 4: Yêu Cầu Chung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
