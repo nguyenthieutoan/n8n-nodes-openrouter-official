@@ -65,3 +65,9 @@ This endpoint filters models according to their primary output capability, ensur
 - **Discovery Endpoint:** `https://openrouter.ai/api/v1/models?output_modalities=image`
 - **Execution Endpoint:** `POST https://openrouter.ai/api/v1/images`
 - **Purpose:** Full parameter image generation & editing (`prompt`, `aspect_ratio`, `resolution`, `size`, `background: transparent`, `output_format`, `quality`, `seed`, `n`, `input_references` for Image-to-Image).
+
+### 7. `OpenRouterAudio` (Dedicated Audio Studio)
+- **Status:** Integrated.
+- **Discovery Endpoint:** `https://openrouter.ai/api/v1/models?output_modalities=speech` (TTS) & `?output_modalities=transcription` (STT).
+- **Execution Endpoints:** `POST https://openrouter.ai/api/v1/audio/speech` (TTS) & `POST https://openrouter.ai/api/v1/audio/transcriptions` (STT).
+- **Purpose:** Text-to-speech with Voice Cloning (`input_references`) and Speech-to-text with Speaker Diarization (`diarize`), Word-Level Timestamps (`timestamp_granularities`), and Custom Domain Keyterms (`keyterms`).

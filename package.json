@@ -48,7 +48,8 @@
       "dist/nodes/RerankerOpenRouter/RerankerOpenRouter.node.js",
       "dist/nodes/OpenRouterCacheChatModel/OpenRouterCacheChatModel.node.js",
       "dist/nodes/OpenRouterDecisions/OpenRouterDecisions.node.js",
-      "dist/nodes/OpenRouterImage/OpenRouterImage.node.js"
+      "dist/nodes/OpenRouterImage/OpenRouterImage.node.js",
+      "dist/nodes/OpenRouterAudio/OpenRouterAudio.node.js"
     ],
     "credentials": [
       "dist/credentials/OpenRouterCommunityApi.credentials.js"

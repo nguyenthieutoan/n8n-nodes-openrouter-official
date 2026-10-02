@@ -15,7 +15,7 @@ Developed and maintained by **[Jay Nguyen (Nguyễn Thiệu Toàn)](https://nguy
 
 While n8n provides a solid foundation for AI Agent workflows, it has historical limitations when it comes to model variety, embedding flexibility, RAG document reranking, prompt caching costs, and deterministic decision-making. **This package fixes all of that.**
 
-By integrating OpenRouter deeply into n8n's standard operations and Advanced AI (LangChain) engine, you unlock **six specialized, enterprise-grade nodes** covering every AI workflow need:
+By integrating OpenRouter deeply into n8n's standard operations and Advanced AI (LangChain) engine, you unlock **seven specialized, enterprise-grade nodes** covering every AI workflow need:
 
 ### 1. The Core `OpenRouter` Node (Multimodal Action Node)
 n8n natively requires you to set up separate credentials, billing, and nodes for OpenAI, Anthropic, Google, etc. Furthermore, handling multimodal inputs (like PDFs, audio, video) can be notoriously clunky.
@@ -61,6 +61,17 @@ Traditional image generation nodes often lock you into rigid defaults, failing t
   - **Format & Compression:** Output as PNG, JPEG, WebP, or SVG with customizable compression levels.
   - **Deterministic Seeds & Multi-image:** Generate multiple variations (`n` up to 10) and pin seeds for reproducibility.
 
+### 7. `OpenRouter Audio Studio` Node
+A full-spectrum speech engine interfacing with OpenRouter's Speech (`/api/v1/audio/speech`) and Transcriptions (`/api/v1/audio/transcriptions`) APIs.
+* **Text to Speech (TTS):**
+  - **Voice Cloning & Design:** Stateless zero-shot voice cloning using reference audio clips (`input_references`) and optional transcripts.
+  - **Customizable Output:** Choose format (`mp3`, `wav`, `pcm`), speeds from `0.25` to `4.0`, and custom voice identifiers.
+* **Speech to Text (STT / Transcriptions):**
+  - **Speaker Diarization:** Identify and tag distinct speakers (`Speaker 1`, `Speaker 2`) in interviews and conference calls.
+  - **Word-Level Timestamps:** Generate fine-grained timestamps per word or sentence for automatic video captions and subtitles.
+  - **Domain Keyterms:** Provide custom vocabulary, company names, or medical/technical terms to bias speech recognition.
+  - **Dual Source:** Accepts incoming binary audio files or direct remote audio URLs.
+
 ---
 
 ## 🚀 Installation
@@ -87,6 +98,7 @@ n8n-nodes-openrouter-official
 |------|------|-------------|
 | **OpenRouter** | Standard Action Node | Unified gateway to process text, analyze multimodal documents/PDFs/media, and generate images/video. |
 | **OpenRouter Image Generation** | Standard Action Node | Dedicated image studio with full parameter control (aspect ratio, resolution, transparent backgrounds, seed, image-to-image). |
+| **OpenRouter Audio Studio** | Standard Action Node | Comprehensive audio suite: Text to Speech with Voice Cloning and Speech to Text with Speaker Diarization, Word Timestamps, and Keyterms. |
 | **OpenRouter Decisions (System One)** | Standard Action Node | Fast, typed, probabilistic decision-making (Choice, Noul, Score) using live System One models on OpenRouter. |
 | **OpenRouter Embeddings** | Advanced AI (LangChain) | Generate vector embeddings using any supported OpenRouter model for your Vector Stores. |
 | **OpenRouter Reranker** | Advanced AI (LangChain) | Rerank and compress documents dynamically in RAG workflows to boost context accuracy. |

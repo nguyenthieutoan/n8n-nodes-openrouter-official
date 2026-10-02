@@ -5,7 +5,8 @@ import { RerankerOpenRouter } from './nodes/RerankerOpenRouter/RerankerOpenRoute
 import { OpenRouterCacheChatModel } from './nodes/OpenRouterCacheChatModel/OpenRouterCacheChatModel.node';
 import { OpenRouterDecisions } from './nodes/OpenRouterDecisions/OpenRouterDecisions.node';
 import { OpenRouterImage } from './nodes/OpenRouterImage/OpenRouterImage.node';
+import { OpenRouterAudio } from './nodes/OpenRouterAudio/OpenRouterAudio.node';
 
 export const credentials = [OpenRouterCommunityApi];
-export const nodes = [OpenRouter, EmbeddingsOpenRouter, RerankerOpenRouter, OpenRouterCacheChatModel, OpenRouterDecisions, OpenRouterImage];
+export const nodes = [OpenRouter, EmbeddingsOpenRouter, RerankerOpenRouter, OpenRouterCacheChatModel, OpenRouterDecisions, OpenRouterImage, OpenRouterAudio];
 
