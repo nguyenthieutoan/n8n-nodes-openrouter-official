@@ -39,8 +39,8 @@ Repeatedly sending large system prompts, extensive documentation, or few-shot ex
 
 ### 5. `OpenRouter Decisions (System One)` Node
 Traditional LLMs are often misused for narrow software decisions (like classification, gatekeeping, or triage), introducing high latency, hallucinations, and fragile JSON parsing.
-* **The Solution:** A dedicated decision node interfacing with OpenRouter's native Decisions router (`/api/alpha/decisions`) and TypeSafe's **System One** model family (such as `typesafe/jev-1.13`).
-* **Deterministic & Typed:** Jev does not output free-form text or reasoning traces. It evaluates application state against typed questions and returns mathematical probabilities and confidence scores.
+* **The Solution:** A dedicated decision node interfacing with OpenRouter's native Decisions router (`/api/alpha/decisions`) and live System One decision models (LiquidAI `liquid/d1`, Together `togethercomputer/tev1-4b-experimental`, Inception `inception/mercury-decide:free`, Upstage `upstage/solar-decide`, Respan `respan/span-01`, TypeSafe `typesafe/jev-1.13`, etc.) discovered dynamically via `https://openrouter.ai/api/v1/models?output_modalities=decisions`.
+* **Deterministic & Typed:** System One models do not output free-form text or reasoning traces. They evaluate application state against typed questions and return mathematical probabilities and confidence scores.
 * **Zero Output Token Cost:** You only pay for input tokens; output decision tokens are **100% FREE**.
 * **Three Mathematical Primitives:**
   - **`Choice`**: Picks one discrete option from mutually exclusive alternatives with calibrated confidence.
@@ -48,7 +48,7 @@ Traditional LLMs are often misused for narrow software decisions (like classific
   - **`Score`**: Places input onto an ordered continuous scale (probability-weighted position from 0 to N-1).
 * **Game-Changing Patterns:**
   - **Gate Agent Tool Calls:** Safeguard autonomous agents by validating tool parameters before execution.
-  - **LLM Verification Cascades:** Draft with cheap models, verify faithfulness with Jev, and escalate to expensive models only on failure (cutting costs by 80%+).
+  - **LLM Verification Cascades:** Draft with cheap models, verify faithfulness with Jev/D1, and escalate to expensive models only on failure (cutting costs by 80%+).
   - **Support & Lead Triage:** Evaluate department, bug status, and urgency in a single parallel request under 150ms.
 
 ---
@@ -76,7 +76,7 @@ n8n-nodes-openrouter-official
 | Node | Type | Description |
 |------|------|-------------|
 | **OpenRouter** | Standard Action Node | Unified gateway to process text, analyze multimodal documents/PDFs/media, and generate images/video. |
-| **OpenRouter Decisions (System One)** | Standard Action Node | Fast, typed, probabilistic decision-making (Choice, Noul, Score) using TypeSafe Jev on OpenRouter. |
+| **OpenRouter Decisions (System One)** | Standard Action Node | Fast, typed, probabilistic decision-making (Choice, Noul, Score) using live System One models on OpenRouter. |
 | **OpenRouter Embeddings** | Advanced AI (LangChain) | Generate vector embeddings using any supported OpenRouter model for your Vector Stores. |
 | **OpenRouter Reranker** | Advanced AI (LangChain) | Rerank and compress documents dynamically in RAG workflows to boost context accuracy. |
 | **OpenRouter Cache Chat Model** | Advanced AI (LangChain) | Chat model with prompt caching support to cut token costs and reduce latency. |

@@ -1,6 +1,9 @@
 import {
 	IExecuteFunctions,
+	ILoadOptionsFunctions,
 	INodeExecutionData,
+	INodeListSearchResult,
+	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
 	NodeOperationError,
@@ -13,8 +16,10 @@ export class OpenRouterDecisions implements INodeType {
 		icon: { light: 'file:openrouter.svg', dark: 'file:openrouter.dark.svg' },
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["modelSelect"] === "custom" ? $parameter["customModel"] : $parameter["modelSelect"]}}',
-		description: 'Make fast, typed, and probabilistic decisions (Choice, Noul, Score) using System One models like TypeSafe Jev on OpenRouter',
+		subtitle:
+			'={{typeof $parameter["model"] === "object" ? ($parameter["model"]["value"] || "") : ($parameter["model"] || ($parameter["modelSelect"] === "custom" ? $parameter["customModel"] : $parameter["modelSelect"]) || "")}}',
+		description:
+			'Make fast, typed, and probabilistic decisions (Choice, Noul, Score) using System One models (LiquidAI, Together, TypeSafe Jev, etc.) on OpenRouter',
 		defaults: {
 			name: 'OpenRouter Decisions',
 		},
@@ -27,44 +32,41 @@ export class OpenRouterDecisions implements INodeType {
 			},
 		],
 		properties: [
-			// 1. Model Selection
+			// 1. Model Selection (Dynamic discovery via https://openrouter.ai/api/v1/models?output_modalities=decisions)
 			{
-				displayName: 'Model',
-				name: 'modelSelect',
-				type: 'options',
-				options: [
+				displayName: 'Model Name or ID',
+				name: 'model',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: 'typesafe/jev-1.13' },
+				required: true,
+				description:
+					'Choose from the live list of OpenRouter decision models, or specify an ID. System One models make fast, typed, and probabilistic decisions with zero output token cost.',
+				modes: [
 					{
-						name: 'TypeSafe Jev 1.13 (Pinned Stable)',
-						value: 'typesafe/jev-1.13',
-						description: 'Deterministic release, recommended for production decision workflows',
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchModels',
+							searchable: true,
+						},
 					},
 					{
-						name: 'TypeSafe Jev (Latest Release Alias)',
-						value: '~typesafe/jev-latest',
-						description: 'Automatically resolves to the latest dated Jev release snapshot',
-					},
-					{
-						name: 'Custom Model Identifier',
-						value: 'custom',
-						description: 'Specify any System One or Decision model available on OpenRouter',
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'typesafe/jev-1.13',
+						validation: [
+							{
+								type: 'regex',
+								properties: {
+									regex: '.*',
+									errorMessage: 'Not a valid model ID',
+								},
+							},
+						],
 					},
 				],
-				default: 'typesafe/jev-1.13',
-				description: 'The System One decision model to evaluate your questions',
-			},
-			{
-				displayName: 'Custom Model ID',
-				name: 'customModel',
-				type: 'string',
-				default: '',
-				placeholder: 'typesafe/jev-1.13',
-				description: 'Enter the exact OpenRouter model identifier to use',
-				displayOptions: {
-					show: {
-						modelSelect: ['custom'],
-					},
-				},
-				required: true,
 			},
 
 			// 2. Application State (Context to evaluate)
@@ -464,6 +466,148 @@ export class OpenRouterDecisions implements INodeType {
 		],
 	};
 
+	methods = {
+		listSearch: {
+			async searchModels(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
+				let models: any[] = [];
+				try {
+					let credentials: { apiKey?: string } | undefined;
+					try {
+						credentials = await this.getCredentials('openRouterCommunityApi');
+					} catch (_) {}
+
+					const headers: Record<string, string> = {};
+					if (credentials?.apiKey) {
+						headers.Authorization = `Bearer ${credentials.apiKey}`;
+					}
+
+					const response = await this.helpers.request({
+						method: 'GET',
+						url: 'https://openrouter.ai/api/v1/models?output_modalities=decisions',
+						headers,
+						json: true,
+					});
+
+					if (response && Array.isArray(response.data)) {
+						models = response.data;
+					}
+				} catch (error) {
+					// Fallback to known pinned decision models if network or API request fails
+					models = [
+						{
+							id: 'typesafe/jev-1.13',
+							name: 'TypeSafe: Jev 1.13',
+							description: 'Deterministic release, recommended for production decision workflows',
+						},
+						{
+							id: '~typesafe/jev-latest',
+							name: 'TypeSafe: Jev Latest',
+							description: 'Automatically resolves to the latest dated Jev release snapshot',
+						},
+						{
+							id: 'liquid/d1',
+							name: 'LiquidAI: D1',
+							description: "Liquid AI's structured decision model served as a System One endpoint",
+						},
+						{
+							id: 'togethercomputer/tev1-4b-experimental',
+							name: 'Together: Tev1 4B Experimental',
+							description: 'Together AI decision model fine-tuned for structured choices',
+						},
+						{
+							id: 'inception/mercury-decide:free',
+							name: 'Inception: Mercury Decide (free)',
+							description: 'Free tier structured decision model from Inception',
+						},
+						{
+							id: 'upstage/solar-decide',
+							name: 'Upstage: Solar Decide',
+							description: 'Structured decision model on Solar Mini',
+						},
+						{
+							id: 'respan/span-01',
+							name: 'Respan: Span-01',
+							description: 'Behavior scoring and decision model from Respan',
+						},
+						{
+							id: 'respan/span-01-lite:free',
+							name: 'Respan: Span-01 Lite (free)',
+							description: 'Free tier behavior scoring model from Respan',
+						},
+						{
+							id: 'jaredpalmer/kev-4b',
+							name: 'Jared Palmer: Kev 4B',
+							description: 'Small open-weight decision model served over System One contract',
+						},
+					];
+				}
+
+				const results = models.map((m: any) => {
+					const displayName = m.name ? `${m.name} (${m.id})` : m.id;
+					let desc = m.description || '';
+					if (m.pricing) {
+						const promptPrice = m.pricing.prompt
+							? `$${(parseFloat(m.pricing.prompt) * 1000000).toFixed(2)}/M in`
+							: 'Free in';
+						const completionPrice =
+							m.pricing.completion === '0' || !m.pricing.completion
+								? 'Free out'
+								: `$${(parseFloat(m.pricing.completion) * 1000000).toFixed(2)}/M out`;
+						const priceTag = `[${promptPrice} | ${completionPrice}]`;
+						desc = desc ? `${priceTag} ${desc}` : priceTag;
+					}
+					if (desc.length > 140) {
+						desc = desc.substring(0, 137) + '...';
+					}
+
+					return {
+						name: displayName,
+						value: m.id,
+						description: desc || undefined,
+					};
+				});
+
+				results.sort((a: any, b: any) => {
+					if (a.value === 'typesafe/jev-1.13') return -1;
+					if (b.value === 'typesafe/jev-1.13') return 1;
+					if (a.value === '~typesafe/jev-latest') return -1;
+					if (b.value === '~typesafe/jev-latest') return 1;
+					return a.name.localeCompare(b.name);
+				});
+
+				if (filter) {
+					const f = filter.toLowerCase();
+					return {
+						results: results.filter(
+							(m: any) =>
+								m.name.toLowerCase().includes(f) ||
+								m.value.toLowerCase().includes(f) ||
+								(m.description && m.description.toLowerCase().includes(f)),
+						),
+					};
+				}
+
+				return { results };
+			},
+		},
+		loadOptions: {
+			async getModels(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const searchRes = await (this as any).methods?.listSearch?.searchModels?.call(this);
+				if (searchRes?.results) {
+					return searchRes.results.map((r: any) => ({
+						name: r.name,
+						value: r.value,
+						description: r.description,
+					}));
+				}
+				return [
+					{ name: 'TypeSafe: Jev 1.13 (typesafe/jev-1.13)', value: 'typesafe/jev-1.13' },
+					{ name: 'TypeSafe: Jev Latest (~typesafe/jev-latest)', value: '~typesafe/jev-latest' },
+				];
+			},
+		},
+	};
+
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
@@ -471,14 +615,36 @@ export class OpenRouterDecisions implements INodeType {
 
 		for (let i = 0; i < items.length; i++) {
 			try {
-				// 1. Resolve Model
-				const modelSelect = this.getNodeParameter('modelSelect', i, 'typesafe/jev-1.13') as string;
-				let model = modelSelect;
-				if (modelSelect === 'custom') {
-					model = (this.getNodeParameter('customModel', i, '') as string).trim();
-					if (!model) {
-						throw new NodeOperationError(this.getNode(), 'Please specify a Custom Model ID', { itemIndex: i });
+				// 1. Resolve Model (supports resourceLocator 'model' as well as legacy 'modelSelect' / 'customModel')
+				let model = '';
+				try {
+					const modelParam = this.getNodeParameter('model', i, '') as any;
+					if (typeof modelParam === 'object' && modelParam !== null && 'value' in modelParam) {
+						model = (modelParam.value || '').toString().trim();
+					} else if (typeof modelParam === 'string' && modelParam.trim()) {
+						model = modelParam.trim();
 					}
+				} catch (_) {}
+
+				// Fallback to legacy parameters if 'model' parameter was not provided
+				if (!model) {
+					try {
+						const modelSelect = this.getNodeParameter('modelSelect', i, '') as string;
+						if (modelSelect === 'custom') {
+							model = (this.getNodeParameter('customModel', i, '') as string).trim();
+							if (!model) {
+								throw new NodeOperationError(this.getNode(), 'Please specify a Custom Model ID', { itemIndex: i });
+							}
+						} else if (modelSelect) {
+							model = modelSelect.trim();
+						}
+					} catch (e) {
+						if (e instanceof NodeOperationError) throw e;
+					}
+				}
+
+				if (!model) {
+					model = 'typesafe/jev-1.13';
 				}
 
 				// 2. Resolve State

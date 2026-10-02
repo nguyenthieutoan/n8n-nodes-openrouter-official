@@ -402,5 +402,122 @@ describe('OpenRouterDecisions Node', () => {
 			}),
 		);
 	});
+
+	it('should dynamically fetch decision models via searchModels (output_modalities=decisions)', async () => {
+		const mockContext = {
+			getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
+			helpers: {
+				request: jest.fn().mockResolvedValue({
+					data: [
+						{
+							id: 'liquid/d1',
+							name: 'LiquidAI: D1',
+							description: 'Structured decision model',
+							pricing: { prompt: '0.00000004', completion: '0' },
+						},
+						{
+							id: 'typesafe/jev-1.13',
+							name: 'TypeSafe: Jev 1.13',
+							description: 'Deterministic release',
+							pricing: { prompt: '0.000000042', completion: '0' },
+						},
+					],
+				}),
+			},
+		} as any;
+
+		const result = await node.methods.listSearch.searchModels.call(mockContext);
+		expect(mockContext.helpers.request).toHaveBeenCalledWith(
+			expect.objectContaining({
+				method: 'GET',
+				url: 'https://openrouter.ai/api/v1/models?output_modalities=decisions',
+				headers: {
+					Authorization: 'Bearer mock-openrouter-key',
+				},
+				json: true,
+			}),
+		);
+
+		expect(result.results.length).toBe(2);
+		expect(result.results[0].value).toBe('typesafe/jev-1.13'); // prioritized at top
+		expect(result.results[1].value).toBe('liquid/d1');
+		expect(result.results[1].name).toBe('LiquidAI: D1 (liquid/d1)');
+	});
+
+	it('should filter decision models when filter parameter is provided', async () => {
+		const mockContext = {
+			getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
+			helpers: {
+				request: jest.fn().mockResolvedValue({
+					data: [
+						{ id: 'liquid/d1', name: 'LiquidAI: D1' },
+						{ id: 'upstage/solar-decide', name: 'Upstage: Solar Decide' },
+					],
+				}),
+			},
+		} as any;
+
+		const result = await node.methods.listSearch.searchModels.call(mockContext, 'solar');
+		expect(result.results.length).toBe(1);
+		expect(result.results[0].value).toBe('upstage/solar-decide');
+	});
+
+	it('should return fallback decision models if API request fails', async () => {
+		const mockContext = {
+			getCredentials: jest.fn().mockRejectedValue(new Error('Network error')),
+			helpers: {
+				request: jest.fn().mockRejectedValue(new Error('Network error')),
+			},
+		} as any;
+
+		const result = await node.methods.listSearch.searchModels.call(mockContext);
+		expect(result.results.length).toBeGreaterThan(0);
+		expect(result.results.some((m: any) => m.value === 'typesafe/jev-1.13')).toBe(true);
+		expect(result.results.some((m: any) => m.value === 'liquid/d1')).toBe(true);
+	});
+
+	it('should execute successfully using resourceLocator model object', async () => {
+		const mockExec = createMockExecuteFunctions();
+
+		mockExec.getNodeParameter.mockImplementation((paramName: string) => {
+			if (paramName === 'model') return { mode: 'list', value: 'liquid/d1' };
+			if (paramName === 'stateMode') return 'currentItem';
+			if (paramName === 'questionMode') return 'builder';
+			if (paramName === 'questionsBuilder') {
+				return {
+					question: [
+						{
+							name: 'is_spam',
+							type: 'noul',
+							instructions: 'Is this message spam?',
+						},
+					],
+				};
+			}
+			if (paramName === 'options') return { simplify: true };
+			return undefined;
+		});
+
+		(mockExec.helpers.request as jest.Mock).mockResolvedValue({
+			id: 'test-liquid-d1',
+			model: 'liquid/d1-20260930',
+			answers: {
+				is_spam: { type: 'noul', noul: 0.05 },
+			},
+		});
+
+		const result = await node.execute.call(mockExec);
+		const outJson = result[0][0].json as Record<string, any>;
+		expect(outJson.decision.is_spam).toBe(0.05);
+		expect(outJson.verdict.is_spam).toBe(false);
+
+		expect(mockExec.helpers.request).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: expect.objectContaining({
+					model: 'liquid/d1',
+				}),
+			}),
+		);
+	});
 });
 
