@@ -49,7 +49,8 @@
       "dist/nodes/OpenRouterCacheChatModel/OpenRouterCacheChatModel.node.js",
       "dist/nodes/OpenRouterDecisions/OpenRouterDecisions.node.js",
       "dist/nodes/OpenRouterImage/OpenRouterImage.node.js",
-      "dist/nodes/OpenRouterAudio/OpenRouterAudio.node.js"
+      "dist/nodes/OpenRouterAudio/OpenRouterAudio.node.js",
+      "dist/nodes/OpenRouterVideo/OpenRouterVideo.node.js"
     ],
     "credentials": [
       "dist/credentials/OpenRouterCommunityApi.credentials.js"
