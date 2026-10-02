@@ -8,7 +8,6 @@ import {
 	type INodeListSearchResult,
 } from 'n8n-workflow';
 import * as path from 'path';
-import * as fs from 'fs';
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 export function requireN8nDependency(dependencyName: string): any {
@@ -48,9 +47,7 @@ export function requireN8nDependency(dependencyName: string): any {
 	for (const candidate of uniqueCandidates) {
 		const p = path.join(candidate, 'node_modules', dependencyName);
 		try {
-			if (fs.existsSync(p) || fs.existsSync(p + '.js')) {
-				return require(p);
-			}
+			return require(p);
 		} catch (_) {}
 	}
 

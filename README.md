@@ -15,13 +15,13 @@ Developed and maintained by **[Jay Nguyen (Nguyễn Thiệu Toàn)](https://nguy
 
 While n8n provides a solid foundation for AI Agent workflows, it has historical limitations when it comes to model variety, embedding flexibility, RAG document reranking, prompt caching costs, and deterministic decision-making. **This package fixes all of that.**
 
-By integrating OpenRouter deeply into n8n's standard operations and Advanced AI (LangChain) engine, you unlock **seven specialized, enterprise-grade nodes** covering every AI workflow need:
+By integrating OpenRouter deeply into n8n's standard operations and Advanced AI (LangChain) engine, you unlock **eight specialized, enterprise-grade nodes** covering every AI workflow need:
 
-### 1. The Core `OpenRouter` Node (Multimodal Action Node)
+### 1. The Core `OpenRouter` Node (Chat & Multimodal Analysis)
 n8n natively requires you to set up separate credentials, billing, and nodes for OpenAI, Anthropic, Google, etc. Furthermore, handling multimodal inputs (like PDFs, audio, video) can be notoriously clunky.
-* **The Solution:** A unified node that connects to **hundreds of models** via a single API key.
-* **Unmatched Multimodal Power:** We've designed this node to easily analyze ANY content—from plain text to complex documents (PDFs), images, audio, and video (provided the selected model, like Gemini or Claude, supports it). Seamlessly supports processing all incoming binary files at once (**Include All Binaries**), comma-separated binary properties, or comma-separated lists of **Image URLs** with automatic bracket/quote/whitespace sanitization. 
-* **Beyond Text:** Support for Image Generation, Video Generation, and Audio processing workflows all within one unified interface.
+* **The Solution:** A unified node that connects to **hundreds of models** via a single API key for both text generation and multimodal content analysis.
+* **Unmatched Multimodal Power:** Easily analyze ANY content—from plain text to complex documents (PDFs), images, audio, and video (provided the selected model, like Gemini or Claude, supports it). Seamlessly supports processing all incoming binary files at once (**Include All Binaries**), comma-separated binary properties, or comma-separated lists of **Image URLs** with automatic bracket/quote/whitespace sanitization.
+* **Fine-Tuned Generation:** Full control over generation options including `Temperature`, `Max Tokens`, and `Top P`.
 
 ### 2. `EmbeddingsOpenRouter` Node (Vector Embeddings)
 n8n's native embedding options are highly restricted (mostly defaulting to OpenAI or a few others).
@@ -72,6 +72,11 @@ A full-spectrum speech engine interfacing with OpenRouter's Speech (`/api/v1/aud
   - **Domain Keyterms:** Provide custom vocabulary, company names, or medical/technical terms to bias speech recognition.
   - **Dual Source:** Accepts incoming binary audio files or direct remote audio URLs.
 
+### 8. `OpenRouter Video Studio` Node
+A dedicated generative video studio interfacing with OpenRouter's Video models (Wan, Veo, Kling, Hailuo, Seedance, and more).
+* **Text-to-Video & Image-to-Video:** Generate high-definition motion videos from detailed text prompts or guide starting frames with reference images.
+* **Fine Parameter Tuning:** Full control over resolution, duration, aspect ratios, camera movement instructions, and audio soundtrack generation.
+
 ---
 
 ## 🚀 Installation
@@ -96,8 +101,9 @@ n8n-nodes-openrouter-official
 
 | Node | Type | Description |
 |------|------|-------------|
-| **OpenRouter** | Standard Action Node | Unified gateway to process text, analyze multimodal documents/PDFs/media, and generate images/video. |
+| **OpenRouter** | Standard Action Node | Unified gateway to generate text and analyze multimodal content (PDFs, images, audio, video, documents). |
 | **OpenRouter Image Generation** | Standard Action Node | Dedicated image studio with full parameter control (aspect ratio, resolution, transparent backgrounds, seed, image-to-image). |
+| **OpenRouter Video Studio** | Standard Action Node | Dedicated video studio supporting text-to-video, image-to-video, camera control, and audio generation. |
 | **OpenRouter Audio Studio** | Standard Action Node | Comprehensive audio suite: Text to Speech with Voice Cloning and Speech to Text with Speaker Diarization, Word Timestamps, and Keyterms. |
 | **OpenRouter Decisions (System One)** | Standard Action Node | Fast, typed, probabilistic decision-making (Choice, Noul, Score) using live System One models on OpenRouter. |
 | **OpenRouter Embeddings** | Advanced AI (LangChain) | Generate vector embeddings using any supported OpenRouter model for your Vector Stores. |

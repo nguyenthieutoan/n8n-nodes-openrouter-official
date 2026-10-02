@@ -1,5 +1,5 @@
 import { mock } from 'jest-mock-extended';
-import { IExecuteFunctions, INodeExecutionData, NodeApiError } from 'n8n-workflow';
+import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
 import { OpenRouter } from '../nodes/OpenRouter/OpenRouter.node';
 
 describe('OpenRouter Node', () => {
@@ -20,83 +20,94 @@ describe('OpenRouter Node', () => {
 		return mockExecuteFunctions;
 	}
 
-	it('should process Generate Image successfully (Happy Path)', async () => {
-		const mockExecuteFunctions = createMockExecuteFunctions();
-		
-		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-			if (paramName === 'operation') return 'generateImage';
-			if (paramName === 'prompt') return 'a cute cat';
-			if (paramName === 'model') return 'mock-model';
-			if (paramName === 'resolution') return '1K';
-			if (paramName === 'aspectRatio') return '16:9';
-			return undefined;
+	describe('Chat / Generate Text (operation: message)', () => {
+		it('should process Message successfully (Happy Path)', async () => {
+			const mockExecuteFunctions = createMockExecuteFunctions();
+
+			mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
+				if (paramName === 'operation') return 'message';
+				if (paramName === 'prompt') return 'Hello, who are you?';
+				if (paramName === 'model') return 'anthropic/claude-3.5-sonnet';
+				if (paramName === 'systemPrompt') return 'You are a helpful assistant';
+				if (paramName === 'options') return { temperature: 0.5, maxTokens: 1000, topP: 0.9 };
+				return undefined;
+			});
+
+			(mockExecuteFunctions.helpers.request as jest.Mock).mockResolvedValue({
+				choices: [{ message: { content: 'I am an AI assistant.' } }],
+				usage: { total_tokens: 25 },
+			});
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result).toHaveLength(1);
+			expect(result[0]).toHaveLength(1);
+			expect(result[0][0].json).toEqual({
+				choices: [{ message: { content: 'I am an AI assistant.' } }],
+				usage: { total_tokens: 25 },
+			});
+
+			expect(mockExecuteFunctions.helpers.request).toHaveBeenCalledWith(
+				expect.objectContaining({
+					url: 'https://openrouter.ai/api/v1/chat/completions',
+					body: {
+						model: 'anthropic/claude-3.5-sonnet',
+						messages: [
+							{ role: 'system', content: 'You are a helpful assistant' },
+							{ role: 'user', content: 'Hello, who are you?' },
+						],
+						temperature: 0.5,
+						max_tokens: 1000,
+						top_p: 0.9,
+					},
+				}),
+			);
 		});
 
-		(mockExecuteFunctions.helpers.request as jest.Mock).mockResolvedValue({
-			data: [
-				{ url: 'https://example.com/image.png', b64_json: 'mock-base64' }
-			],
-			usage: { total_tokens: 10 }
+		it('should throw error on API failure when continueOnFail is false', async () => {
+			const mockExecuteFunctions = createMockExecuteFunctions();
+
+			mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
+				if (paramName === 'operation') return 'message';
+				if (paramName === 'prompt') return 'test';
+				if (paramName === 'model') return 'mock-model';
+				return undefined;
+			});
+			mockExecuteFunctions.getNode.mockReturnValue({
+				id: '1',
+				name: 'OpenRouter',
+				type: 'n8n-nodes-openrouter-official.OpenRouter',
+				typeVersion: 1,
+				position: [0, 0],
+				parameters: {},
+			});
+			mockExecuteFunctions.continueOnFail.mockReturnValue(false);
+
+			const apiError = new Error('API Error');
+			(mockExecuteFunctions.helpers.request as jest.Mock).mockRejectedValue(apiError);
+
+			await expect(node.execute.call(mockExecuteFunctions)).rejects.toThrow();
 		});
 
-		const result = await node.execute.call(mockExecuteFunctions);
+		it('should handle continueOnFail when API fails', async () => {
+			const mockExecuteFunctions = createMockExecuteFunctions();
 
-		expect(result).toHaveLength(1);
-		expect(result[0]).toHaveLength(1);
-		expect(result[0][0].json).toEqual({
-			prompt: 'a cute cat',
-			usage: { total_tokens: 10 }
+			mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
+				if (paramName === 'operation') return 'message';
+				if (paramName === 'prompt') return 'test';
+				if (paramName === 'model') return 'mock-model';
+				return undefined;
+			});
+			mockExecuteFunctions.continueOnFail.mockReturnValue(true);
+
+			const apiError = new Error('API Error');
+			(mockExecuteFunctions.helpers.request as jest.Mock).mockRejectedValue(apiError);
+
+			const result = await node.execute.call(mockExecuteFunctions);
+
+			expect(result[0][0].json).toHaveProperty('error');
+			expect(result[0][0].pairedItem).toEqual({ item: 0 });
 		});
-		expect(result[0][0].binary?.data).toEqual('mock-binary-data');
-	});
-
-	it('should throw NodeApiError on API failure (Failed API)', async () => {
-		const mockExecuteFunctions = createMockExecuteFunctions();
-		
-		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-			if (paramName === 'operation') return 'generateImage';
-			if (paramName === 'prompt') return 'test';
-			if (paramName === 'model') return 'mock-model';
-			if (paramName === 'resolution') return '1K';
-			if (paramName === 'aspectRatio') return '16:9';
-			return undefined;
-		});
-		mockExecuteFunctions.getNode.mockReturnValue({
-			id: '1',
-			name: 'OpenRouter',
-			type: 'n8n-nodes-openrouter-official.OpenRouter',
-			typeVersion: 1,
-			position: [0, 0],
-			parameters: {}
-		});
-		mockExecuteFunctions.continueOnFail.mockReturnValue(false);
-
-		const apiError = new Error('API Error');
-		(mockExecuteFunctions.helpers.request as jest.Mock).mockRejectedValue(apiError);
-
-		await expect(node.execute.call(mockExecuteFunctions)).rejects.toThrow();
-	});
-
-	it('should handle continueOnFail when API fails', async () => {
-		const mockExecuteFunctions = createMockExecuteFunctions();
-		
-		mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
-			if (paramName === 'operation') return 'generateImage';
-			if (paramName === 'prompt') return 'test';
-			if (paramName === 'model') return 'mock-model';
-			if (paramName === 'resolution') return '1K';
-			if (paramName === 'aspectRatio') return '16:9';
-			return undefined;
-		});
-		mockExecuteFunctions.continueOnFail.mockReturnValue(true);
-
-		const apiError = new Error('API Error');
-		(mockExecuteFunctions.helpers.request as jest.Mock).mockRejectedValue(apiError);
-
-		const result = await node.execute.call(mockExecuteFunctions);
-		
-		expect(result[0][0].json).toHaveProperty('error');
-		expect(result[0][0].pairedItem).toEqual({ item: 0 });
 	});
 
 	describe('Analyze Content - Image URLs & Multi-Binary', () => {
@@ -416,15 +427,15 @@ describe('OpenRouter Node', () => {
 	});
 
 	describe('searchModels with output_modalities', () => {
-		it('should query output_modalities=image when operation is generateImage', async () => {
+		it('should query output_modalities=text when operation is message', async () => {
 			const mockContext = {
 				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
-				getNodeParameter: jest.fn().mockReturnValue('generateImage'),
+				getNodeParameter: jest.fn().mockReturnValue('message'),
 				helpers: {
 					request: jest.fn().mockResolvedValue({
 						data: [
-							{ id: 'black-forest-labs/flux-3-image' },
-							{ id: 'recraft/recraft-v4.1-flash' },
+							{ id: 'anthropic/claude-3.5-sonnet' },
+							{ id: 'openai/gpt-4o' },
 						],
 					}),
 				},
@@ -433,71 +444,11 @@ describe('OpenRouter Node', () => {
 			const result = await node.methods.listSearch.searchModels.call(mockContext);
 			expect(mockContext.helpers.request).toHaveBeenCalledWith(
 				expect.objectContaining({
-					url: 'https://openrouter.ai/api/v1/models?output_modalities=image',
+					url: 'https://openrouter.ai/api/v1/models?output_modalities=text',
 				}),
 			);
 			expect(result.results).toHaveLength(2);
-			expect(result.results[0].value).toBe('black-forest-labs/flux-3-image');
-		});
-
-		it('should query output_modalities=video when operation is generateVideo', async () => {
-			const mockContext = {
-				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
-				getNodeParameter: jest.fn().mockReturnValue('generateVideo'),
-				helpers: {
-					request: jest.fn().mockResolvedValue({
-						data: [{ id: 'alibaba/wan-3.0' }],
-					}),
-				},
-			} as any;
-
-			const result = await node.methods.listSearch.searchModels.call(mockContext);
-			expect(mockContext.helpers.request).toHaveBeenCalledWith(
-				expect.objectContaining({
-					url: 'https://openrouter.ai/api/v1/models?output_modalities=video',
-				}),
-			);
-			expect(result.results[0].value).toBe('alibaba/wan-3.0');
-		});
-
-		it('should query output_modalities=speech when operation is textToSpeech', async () => {
-			const mockContext = {
-				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
-				getNodeParameter: jest.fn().mockReturnValue('textToSpeech'),
-				helpers: {
-					request: jest.fn().mockResolvedValue({
-						data: [{ id: 'google/gemini-3.8-flash-tts' }],
-					}),
-				},
-			} as any;
-
-			const result = await node.methods.listSearch.searchModels.call(mockContext);
-			expect(mockContext.helpers.request).toHaveBeenCalledWith(
-				expect.objectContaining({
-					url: 'https://openrouter.ai/api/v1/models?output_modalities=speech',
-				}),
-			);
-			expect(result.results[0].value).toBe('google/gemini-3.8-flash-tts');
-		});
-
-		it('should query output_modalities=transcription when operation is speechToText', async () => {
-			const mockContext = {
-				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
-				getNodeParameter: jest.fn().mockReturnValue('speechToText'),
-				helpers: {
-					request: jest.fn().mockResolvedValue({
-						data: [{ id: 'google/gemini-3.5-transcribe' }],
-					}),
-				},
-			} as any;
-
-			const result = await node.methods.listSearch.searchModels.call(mockContext);
-			expect(mockContext.helpers.request).toHaveBeenCalledWith(
-				expect.objectContaining({
-					url: 'https://openrouter.ai/api/v1/models?output_modalities=transcription',
-				}),
-			);
-			expect(result.results[0].value).toBe('google/gemini-3.5-transcribe');
+			expect(result.results[0].value).toBe('anthropic/claude-3.5-sonnet');
 		});
 
 		it('should filter multimodal models for analyze operation', async () => {

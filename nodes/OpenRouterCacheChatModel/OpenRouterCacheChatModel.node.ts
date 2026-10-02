@@ -1,6 +1,5 @@
 import type { ChatOpenAI as ChatOpenAIType, ClientOptions } from '@langchain/openai';
 import * as path from 'path';
-import * as fs from 'fs';
 import {
 	NodeConnectionTypes,
 	type INodeType,
@@ -501,9 +500,7 @@ export function requireN8nDependency(dependencyName: string): any {
 	for (const candidate of uniqueCandidates) {
 		const p = path.join(candidate, 'node_modules', dependencyName);
 		try {
-			if (fs.existsSync(p) || fs.existsSync(p + '.js')) {
-				return require(p);
-			}
+			return require(p);
 		} catch (_) {}
 	}
 

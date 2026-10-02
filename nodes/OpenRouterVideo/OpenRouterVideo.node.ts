@@ -27,7 +27,7 @@ export class OpenRouterVideo implements INodeType {
 		icon: { light: 'file:openrouter.svg', dark: 'file:openrouter.dark.svg' },
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["model"]}}',
+		subtitle: '={{typeof $parameter["model"] === "object" ? ($parameter["model"].value || "") : $parameter["model"]}}',
 		description:
 			'Generate videos from text prompts or images using OpenRouter Video models (Wan, Veo, Kling, Hailuo, Seedance, and more). Supports Image-to-Video, resolution, duration, aspect ratio, and audio generation.',
 		defaults: {

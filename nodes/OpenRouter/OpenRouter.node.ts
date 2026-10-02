@@ -141,32 +141,8 @@ export class OpenRouter implements INodeType {
 						description: 'Analyze text, documents (PDF), images, audio or video using a supported multimodal model',
 						action: 'Analyze content',
 					},
-					{
-						name: 'Generate Image',
-						value: 'generateImage',
-						description: 'Generate an image from a text prompt (requires image generation model)',
-						action: 'Generate an image',
-					},
-					{
-						name: 'Generate Video (Async)',
-						value: 'generateVideo',
-						description: 'Generate a video from a text prompt (requires video generation model)',
-						action: 'Generate a video',
-					},
-					{
-						name: 'Speech To Text',
-						value: 'speechToText',
-						description: 'Transcribe audio into text (requires supported multimodal model)',
-						action: 'Transcribe audio',
-					},
-					{
-						name: 'Text To Speech',
-						value: 'textToSpeech',
-						description: 'Convert text into audio (requires supported multimodal model)',
-						action: 'Convert text to speech',
-					},
 				],
-				default: 'analyze',
+				default: 'message',
 			},
 			{
 				displayName: 'Model Name or ID',
@@ -207,11 +183,7 @@ export class OpenRouter implements INodeType {
 				type: 'string',
 				default: '',
 				required: true,
-				displayOptions: {
-					show: {
-						operation: ['message', 'analyze', 'generateImage', 'generateVideo'],
-					},
-				},
+				description: 'The text prompt or question to send to the model',
 			},
 			{
 				displayName: 'Media Source',
@@ -264,7 +236,7 @@ export class OpenRouter implements INodeType {
 				description: 'Name of the binary property (or comma-separated list of properties, e.g. data1, data2) containing the file(s) to process',
 				displayOptions: {
 					show: {
-						operation: ['analyze', 'speechToText'],
+						operation: ['analyze'],
 					},
 					hide: {
 						mediaSource: ['urls'],
@@ -302,18 +274,6 @@ export class OpenRouter implements INodeType {
 				},
 			},
 			{
-				displayName: 'Text to Speak',
-				name: 'text',
-				type: 'string',
-				default: '',
-				required: true,
-				displayOptions: {
-					show: {
-						operation: ['textToSpeech'],
-					},
-				},
-			},
-			{
 				displayName: 'Options',
 				name: 'options',
 				type: 'collection',
@@ -321,40 +281,35 @@ export class OpenRouter implements INodeType {
 				default: {},
 				options: [
 					{
-						displayName: 'Resolution',
-						name: 'resolution',
-						type: 'options',
-						options: [
-							{ name: '512x512', value: '512' },
-							{ name: '1K', value: '1K' },
-							{ name: '2K', value: '2K' },
-							{ name: '4K', value: '4K' },
-						],
-						default: '1K',
-					},
-					{
-						displayName: 'Aspect Ratio',
-						name: 'aspectRatio',
-						type: 'string',
-						default: '16:9',
-					},
-					{
-						displayName: 'Duration (Seconds)',
-						name: 'duration',
+						displayName: 'Temperature',
+						name: 'temperature',
 						type: 'number',
-						default: 5,
+						typeOptions: {
+							minValue: 0,
+							maxValue: 2,
+							numberPrecision: 1,
+						},
+						default: 0.7,
+						description: 'Controls randomness: Lower values make responses more deterministic, higher values make output more creative',
 					},
 					{
-						displayName: 'Voice',
-						name: 'voice',
-						type: 'string',
-						default: 'alloy',
-					},
-					{
-						displayName: 'Speed',
-						name: 'speed',
+						displayName: 'Max Tokens',
+						name: 'maxTokens',
 						type: 'number',
+						default: 2048,
+						description: 'The maximum number of tokens to generate in the completion',
+					},
+					{
+						displayName: 'Top P',
+						name: 'topP',
+						type: 'number',
+						typeOptions: {
+							minValue: 0,
+							maxValue: 1,
+							numberPrecision: 2,
+						},
 						default: 1,
+						description: 'Controls diversity via nucleus sampling',
 					},
 				],
 			},
@@ -367,22 +322,9 @@ export class OpenRouter implements INodeType {
 				const credentials = await this.getCredentials('openRouterCommunityApi');
 				const operation = this.getNodeParameter('operation', undefined) as string;
 
-				let modality = 'text';
-				if (operation === 'generateImage') {
-					modality = 'image';
-				} else if (operation === 'generateVideo') {
-					modality = 'video';
-				} else if (operation === 'textToSpeech') {
-					modality = 'speech';
-				} else if (operation === 'speechToText') {
-					modality = 'transcription';
-				} else if (operation === 'message' || operation === 'analyze') {
-					modality = 'text';
-				}
-
 				const response = await this.helpers.request({
 					method: 'GET',
-					url: `https://openrouter.ai/api/v1/models?output_modalities=${modality}`,
+					url: 'https://openrouter.ai/api/v1/models?output_modalities=text',
 					headers: {
 						Authorization: `Bearer ${credentials.apiKey}`,
 					},
@@ -445,6 +387,7 @@ export class OpenRouter implements INodeType {
 					model = model.value;
 				}
 				model = model as string;
+				const options = (this.getNodeParameter('options', i, {}) as any) || {};
 
 				if (operation === 'message') {
 					const prompt = this.getNodeParameter('prompt', i) as string;
@@ -456,14 +399,19 @@ export class OpenRouter implements INodeType {
 					}
 					messages.push({ role: 'user', content: prompt });
 
+					const body: any = {
+						model,
+						messages,
+					};
+					if (options.temperature !== undefined) body.temperature = options.temperature;
+					if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens;
+					if (options.topP !== undefined) body.top_p = options.topP;
+
 					const response = await this.helpers.request({
 						method: 'POST',
 						url: 'https://openrouter.ai/api/v1/chat/completions',
 						headers: { ...defaultHeaders, 'Content-Type': 'application/json' },
-						body: {
-							model,
-							messages,
-						},
+						body,
 						json: true,
 					});
 
@@ -471,8 +419,7 @@ export class OpenRouter implements INodeType {
 						json: response,
 						pairedItem: { item: i },
 					});
-				}
-				else if (operation === 'analyze') {
+				} else if (operation === 'analyze') {
 					const prompt = this.getNodeParameter('prompt', i) as string;
 					const mediaSource = this.getNodeParameter('mediaSource', i, 'binary') as string;
 					const content: any[] = [{ type: 'text', text: prompt }];
@@ -542,19 +489,24 @@ export class OpenRouter implements INodeType {
 						);
 					}
 
+					const body: any = {
+						model,
+						messages: [
+							{
+								role: 'user',
+								content,
+							},
+						],
+					};
+					if (options.temperature !== undefined) body.temperature = options.temperature;
+					if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens;
+					if (options.topP !== undefined) body.top_p = options.topP;
+
 					const response = await this.helpers.request({
 						method: 'POST',
 						url: 'https://openrouter.ai/api/v1/chat/completions',
 						headers: { ...defaultHeaders, 'Content-Type': 'application/json' },
-						body: {
-							model,
-							messages: [
-								{
-									role: 'user',
-									content,
-								},
-							],
-						},
+						body,
 						json: true,
 					});
 
@@ -562,141 +514,8 @@ export class OpenRouter implements INodeType {
 						json: response,
 						pairedItem: { item: i },
 					});
-				} 
-				else if (operation === 'generateImage' || operation === 'generateVideo') {
-					const prompt = this.getNodeParameter('prompt', i) as string;
-					const options = this.getNodeParameter('options', i) as any || {};
-					const body: any = { model, prompt };
-
-					if (operation === 'generateImage') {
-						if (options.resolution) body.resolution = options.resolution;
-						if (options.aspectRatio) body.aspect_ratio = options.aspectRatio;
-						
-						const response = await this.helpers.request({
-							method: 'POST',
-							url: 'https://openrouter.ai/api/v1/images/generations',
-							headers: { ...defaultHeaders, 'Content-Type': 'application/json' },
-							body,
-							json: true,
-						});
-
-						const base64Data = response.data[0].b64_json || response.data[0].url;
-						let binary;
-						
-						if (base64Data && base64Data.startsWith('http')) {
-							const imageBuffer = await this.helpers.request({
-								method: 'GET',
-								url: base64Data,
-								encoding: null,
-							});
-							binary = await this.helpers.prepareBinaryData(imageBuffer, `image_${i}.png`, 'image/png');
-						} else if (base64Data) {
-							const buffer = Buffer.from(base64Data, 'base64');
-							binary = await this.helpers.prepareBinaryData(buffer, `image_${i}.png`, 'image/png');
-						}
-
-						const outItem: INodeExecutionData = {
-							json: { prompt, usage: response.usage || {} },
-							pairedItem: { item: i },
-						};
-						if (binary) outItem.binary = { data: binary };
-						returnData.push(outItem);
-					} else {
-						if (options.duration) body.duration = options.duration;
-						const initResponse = await this.helpers.request({
-							method: 'POST',
-							url: 'https://openrouter.ai/api/v1/video/generations',
-							headers: { ...defaultHeaders, 'Content-Type': 'application/json' },
-							body,
-							json: true,
-						});
-
-						const jobId = initResponse.job_id || initResponse.id;
-						let status = 'processing';
-						let videoUrl = '';
-						const maxRetries = 30;
-						let attempts = 0;
-
-						while ((status === 'processing' || status === 'pending') && attempts < maxRetries) {
-							await new Promise((resolve) => setTimeout(resolve, 10000));
-							attempts++;
-							const checkResponse = await this.helpers.request({
-								method: 'GET',
-								url: `https://openrouter.ai/api/v1/video/generations/${jobId}`,
-								headers: defaultHeaders,
-								json: true,
-							});
-							status = checkResponse.status;
-							if (status === 'completed' || status === 'succeeded') {
-								videoUrl = checkResponse.video_url || checkResponse.data?.url;
-								break;
-							} else if (status === 'failed') {
-								throw new Error(`Video generation failed: ${checkResponse.error?.message || 'Unknown error'}`);
-							}
-						}
-						const videoBuffer = await this.helpers.request({
-							method: 'GET',
-							url: videoUrl,
-							encoding: null,
-						});
-						const binaryData = await this.helpers.prepareBinaryData(videoBuffer, `video_${i}.mp4`, 'video/mp4');
-						returnData.push({
-							json: { jobId, prompt, status },
-							binary: { data: binaryData },
-							pairedItem: { item: i },
-						});
-					}
-				}
-				else if (operation === 'speechToText') {
-					const binaryPropertyName = this.getNodeParameter('binaryPropertyName', i) as string;
-					const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
-					const binaryDataBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
-
-					const base64Data = binaryDataBuffer.toString('base64');
-					
-					const response = await this.helpers.request({
-						method: 'POST',
-						url: 'https://openrouter.ai/api/v1/audio/transcriptions',
-						headers: { ...defaultHeaders, 'Content-Type': 'application/json' },
-						body: {
-							model,
-							file: `data:${binaryData.mimeType};base64,${base64Data}`,
-						},
-						json: true,
-					});
-
-					returnData.push({
-						json: response,
-						pairedItem: { item: i },
-					});
-				}
-				else if (operation === 'textToSpeech') {
-					const text = this.getNodeParameter('text', i) as string;
-					const options = this.getNodeParameter('options', i) as any || {};
-					
-					const voice = options.voice || 'alloy';
-					const speed = options.speed || 1;
-
-					const audioBuffer = await this.helpers.request({
-						method: 'POST',
-						url: 'https://openrouter.ai/api/v1/audio/speech',
-						headers: { ...defaultHeaders, 'Content-Type': 'application/json' },
-						body: {
-							model,
-							input: text,
-							voice,
-							speed,
-						},
-						encoding: null,
-					});
-
-					const binaryData = await this.helpers.prepareBinaryData(audioBuffer, `audio_${i}.mp3`, 'audio/mp3');
-
-					returnData.push({
-						json: { text, voice, speed },
-						binary: { data: binaryData },
-						pairedItem: { item: i },
-					});
+				} else {
+					throw new NodeOperationError(this.getNode(), `Unknown operation "${operation}"`, { itemIndex: i });
 				}
 			} catch (error: any) {
 				if (this.continueOnFail()) {

@@ -23,7 +23,7 @@ export class OpenRouterAudio implements INodeType {
 		icon: { light: 'file:openrouter.svg', dark: 'file:openrouter.dark.svg' },
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["operation"] + ": " + $parameter["model"]}}',
+		subtitle: '={{$parameter["operation"] + ": " + (typeof $parameter["model"] === "object" ? ($parameter["model"].value || "") : $parameter["model"])}}',
 		description:
 			'Text to Speech with voice cloning and Speech to Text with speaker diarization, timestamps, and vocabulary control',
 		defaults: {

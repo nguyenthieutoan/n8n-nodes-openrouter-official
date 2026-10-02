@@ -23,7 +23,7 @@ export class OpenRouterImage implements INodeType {
 		icon: { light: 'file:openrouter.svg', dark: 'file:openrouter.dark.svg' },
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["model"]}}',
+		subtitle: '={{typeof $parameter["model"] === "object" ? ($parameter["model"].value || "") : $parameter["model"]}}',
 		description: 'Generate and edit images using OpenRouter unified Image API with full parameter control',
 		defaults: {
 			name: 'OpenRouter Image',
