@@ -59,3 +59,9 @@ This endpoint filters models according to their primary output capability, ensur
   - `textToSpeech`: `output_modalities=speech` (Microsoft MAI, Gemini TTS, etc.)
   - `speechToText`: `output_modalities=transcription` (Gemini Transcribe, AssemblyAI, etc.)
   - `analyze`: `output_modalities=text` filtered for models accepting multimodal inputs (image, video, audio, files).
+
+### 6. `OpenRouterImage` (Dedicated Image Studio)
+- **Status:** Integrated.
+- **Discovery Endpoint:** `https://openrouter.ai/api/v1/models?output_modalities=image`
+- **Execution Endpoint:** `POST https://openrouter.ai/api/v1/images`
+- **Purpose:** Full parameter image generation & editing (`prompt`, `aspect_ratio`, `resolution`, `size`, `background: transparent`, `output_format`, `quality`, `seed`, `n`, `input_references` for Image-to-Image).

@@ -15,7 +15,7 @@ Developed and maintained by **[Jay Nguyen (Nguyễn Thiệu Toàn)](https://nguy
 
 While n8n provides a solid foundation for AI Agent workflows, it has historical limitations when it comes to model variety, embedding flexibility, RAG document reranking, prompt caching costs, and deterministic decision-making. **This package fixes all of that.**
 
-By integrating OpenRouter deeply into n8n's standard operations and Advanced AI (LangChain) engine, you unlock **five specialized, enterprise-grade nodes** covering every AI workflow need:
+By integrating OpenRouter deeply into n8n's standard operations and Advanced AI (LangChain) engine, you unlock **six specialized, enterprise-grade nodes** covering every AI workflow need:
 
 ### 1. The Core `OpenRouter` Node (Multimodal Action Node)
 n8n natively requires you to set up separate credentials, billing, and nodes for OpenAI, Anthropic, Google, etc. Furthermore, handling multimodal inputs (like PDFs, audio, video) can be notoriously clunky.
@@ -51,6 +51,16 @@ Traditional LLMs are often misused for narrow software decisions (like classific
   - **LLM Verification Cascades:** Draft with cheap models, verify faithfulness with Jev/D1, and escalate to expensive models only on failure (cutting costs by 80%+).
   - **Support & Lead Triage:** Evaluate department, bug status, and urgency in a single parallel request under 150ms.
 
+### 6. `OpenRouter Image Generation` Node
+Traditional image generation nodes often lock you into rigid defaults, failing to expose provider-specific capabilities or image editing workflows.
+* **The Solution:** A dedicated image generation node interfacing with OpenRouter's unified Image API (`/api/v1/images`), dynamically discovering all live image models (FLUX, Recraft, SDXL, GPT Image, ByteDance Seedream, etc.).
+* **Full Parameter Control:**
+  - **Aspect Ratio & Resolution:** Pick from standard aspect ratios (`1:1`, `16:9`, `9:16`, `4:3`, `3:2`, `21:9`, `auto`) and normalized tiers (`512`, `768`, `1K`, `1.5K`, `2K`, `4K`) or explicit pixel dimensions.
+  - **Transparent Backgrounds:** Native `background: transparent` support for generating icons, logos, and stickers without backgrounds.
+  - **Image-to-Image / Style Reference:** Pass reference images via n8n binary properties or public image URLs to guide style, edit, or transform images.
+  - **Format & Compression:** Output as PNG, JPEG, WebP, or SVG with customizable compression levels.
+  - **Deterministic Seeds & Multi-image:** Generate multiple variations (`n` up to 10) and pin seeds for reproducibility.
+
 ---
 
 ## 🚀 Installation
@@ -76,6 +86,7 @@ n8n-nodes-openrouter-official
 | Node | Type | Description |
 |------|------|-------------|
 | **OpenRouter** | Standard Action Node | Unified gateway to process text, analyze multimodal documents/PDFs/media, and generate images/video. |
+| **OpenRouter Image Generation** | Standard Action Node | Dedicated image studio with full parameter control (aspect ratio, resolution, transparent backgrounds, seed, image-to-image). |
 | **OpenRouter Decisions (System One)** | Standard Action Node | Fast, typed, probabilistic decision-making (Choice, Noul, Score) using live System One models on OpenRouter. |
 | **OpenRouter Embeddings** | Advanced AI (LangChain) | Generate vector embeddings using any supported OpenRouter model for your Vector Stores. |
 | **OpenRouter Reranker** | Advanced AI (LangChain) | Rerank and compress documents dynamically in RAG workflows to boost context accuracy. |
