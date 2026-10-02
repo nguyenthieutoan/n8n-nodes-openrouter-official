@@ -218,7 +218,7 @@ export class OpenRouterCacheChatModel implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '/models',
+								url: '/models?output_modalities=text',
 							},
 							output: {
 								postReceive: [

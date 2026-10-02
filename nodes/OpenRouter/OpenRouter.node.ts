@@ -365,26 +365,48 @@ export class OpenRouter implements INodeType {
 		listSearch: {
 			async searchModels(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
 				const credentials = await this.getCredentials('openRouterCommunityApi');
+				const operation = this.getNodeParameter('operation', undefined) as string;
+
+				let modality = 'text';
+				if (operation === 'generateImage') {
+					modality = 'image';
+				} else if (operation === 'generateVideo') {
+					modality = 'video';
+				} else if (operation === 'textToSpeech') {
+					modality = 'speech';
+				} else if (operation === 'speechToText') {
+					modality = 'transcription';
+				} else if (operation === 'message' || operation === 'analyze') {
+					modality = 'text';
+				}
+
 				const response = await this.helpers.request({
 					method: 'GET',
-					url: 'https://openrouter.ai/api/v1/models',
+					url: `https://openrouter.ai/api/v1/models?output_modalities=${modality}`,
 					headers: {
 						Authorization: `Bearer ${credentials.apiKey}`,
 					},
 					json: true,
 				});
 
-				const operation = this.getNodeParameter('operation', undefined) as string;
-				let models = response.data;
+				let models = response.data || [];
 
-				// Filter by functionality based on the current operation
+				// For analyze operation, filter models that support multimodal inputs (image, video, audio, files)
 				if (operation === 'analyze') {
-					models = models.filter((m: any) => m.architecture?.modality?.includes('image') || m.architecture?.modality?.includes('video'));
-				} else if (operation === 'speechToText' || operation === 'textToSpeech') {
-					models = models.filter((m: any) => m.architecture?.modality?.includes('audio') || m.id.includes('audio') || m.id.includes('tts') || m.id.includes('stt') || m.id.includes('whisper'));
-				} else if (operation === 'generateImage') {
-					// Fallback for missing explicit image modalities in some OpenRouter models, just list image models if known
-					models = models.filter((m: any) => m.architecture?.modality?.includes('image') || m.id.includes('dall-e') || m.id.includes('stable') || m.id.includes('flux') || m.id.includes('midjourney'));
+					models = models.filter((m: any) => {
+						const mod = m.architecture?.modality || '';
+						const inMod = m.architecture?.input_modalities || [];
+						return (
+							mod.includes('image') ||
+							mod.includes('video') ||
+							mod.includes('audio') ||
+							mod.includes('multimodal') ||
+							inMod.includes('image') ||
+							inMod.includes('video') ||
+							inMod.includes('audio') ||
+							inMod.includes('file')
+						);
+					});
 				}
 
 				let results = models.map((m: any) => ({

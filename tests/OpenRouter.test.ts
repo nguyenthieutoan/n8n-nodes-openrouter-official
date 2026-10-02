@@ -414,4 +414,120 @@ describe('OpenRouter Node', () => {
 			);
 		});
 	});
+
+	describe('searchModels with output_modalities', () => {
+		it('should query output_modalities=image when operation is generateImage', async () => {
+			const mockContext = {
+				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
+				getNodeParameter: jest.fn().mockReturnValue('generateImage'),
+				helpers: {
+					request: jest.fn().mockResolvedValue({
+						data: [
+							{ id: 'black-forest-labs/flux-3-image' },
+							{ id: 'recraft/recraft-v4.1-flash' },
+						],
+					}),
+				},
+			} as any;
+
+			const result = await node.methods.listSearch.searchModels.call(mockContext);
+			expect(mockContext.helpers.request).toHaveBeenCalledWith(
+				expect.objectContaining({
+					url: 'https://openrouter.ai/api/v1/models?output_modalities=image',
+				}),
+			);
+			expect(result.results).toHaveLength(2);
+			expect(result.results[0].value).toBe('black-forest-labs/flux-3-image');
+		});
+
+		it('should query output_modalities=video when operation is generateVideo', async () => {
+			const mockContext = {
+				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
+				getNodeParameter: jest.fn().mockReturnValue('generateVideo'),
+				helpers: {
+					request: jest.fn().mockResolvedValue({
+						data: [{ id: 'alibaba/wan-3.0' }],
+					}),
+				},
+			} as any;
+
+			const result = await node.methods.listSearch.searchModels.call(mockContext);
+			expect(mockContext.helpers.request).toHaveBeenCalledWith(
+				expect.objectContaining({
+					url: 'https://openrouter.ai/api/v1/models?output_modalities=video',
+				}),
+			);
+			expect(result.results[0].value).toBe('alibaba/wan-3.0');
+		});
+
+		it('should query output_modalities=speech when operation is textToSpeech', async () => {
+			const mockContext = {
+				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
+				getNodeParameter: jest.fn().mockReturnValue('textToSpeech'),
+				helpers: {
+					request: jest.fn().mockResolvedValue({
+						data: [{ id: 'google/gemini-3.8-flash-tts' }],
+					}),
+				},
+			} as any;
+
+			const result = await node.methods.listSearch.searchModels.call(mockContext);
+			expect(mockContext.helpers.request).toHaveBeenCalledWith(
+				expect.objectContaining({
+					url: 'https://openrouter.ai/api/v1/models?output_modalities=speech',
+				}),
+			);
+			expect(result.results[0].value).toBe('google/gemini-3.8-flash-tts');
+		});
+
+		it('should query output_modalities=transcription when operation is speechToText', async () => {
+			const mockContext = {
+				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
+				getNodeParameter: jest.fn().mockReturnValue('speechToText'),
+				helpers: {
+					request: jest.fn().mockResolvedValue({
+						data: [{ id: 'google/gemini-3.5-transcribe' }],
+					}),
+				},
+			} as any;
+
+			const result = await node.methods.listSearch.searchModels.call(mockContext);
+			expect(mockContext.helpers.request).toHaveBeenCalledWith(
+				expect.objectContaining({
+					url: 'https://openrouter.ai/api/v1/models?output_modalities=transcription',
+				}),
+			);
+			expect(result.results[0].value).toBe('google/gemini-3.5-transcribe');
+		});
+
+		it('should filter multimodal models for analyze operation', async () => {
+			const mockContext = {
+				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-openrouter-key' }),
+				getNodeParameter: jest.fn().mockReturnValue('analyze'),
+				helpers: {
+					request: jest.fn().mockResolvedValue({
+						data: [
+							{
+								id: 'text-only-model',
+								architecture: { modality: 'text->text', input_modalities: ['text'] },
+							},
+							{
+								id: 'multimodal-model',
+								architecture: { modality: 'text+image->text', input_modalities: ['text', 'image'] },
+							},
+						],
+					}),
+				},
+			} as any;
+
+			const result = await node.methods.listSearch.searchModels.call(mockContext);
+			expect(mockContext.helpers.request).toHaveBeenCalledWith(
+				expect.objectContaining({
+					url: 'https://openrouter.ai/api/v1/models?output_modalities=text',
+				}),
+			);
+			expect(result.results).toHaveLength(1);
+			expect(result.results[0].value).toBe('multimodal-model');
+		});
+	});
 });
