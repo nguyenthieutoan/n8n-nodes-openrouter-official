@@ -102,6 +102,57 @@ export function buildMediaContent(binaryData: any, binaryDataBuffer: Buffer, fil
 	};
 }
 
+export function buildProviderRouting(options: any): { provider?: Record<string, unknown>; service_tier?: string } {
+	const provider: Record<string, unknown> = {};
+	const onlyList: string[] = [];
+
+	if (options.providerEndpoint && typeof options.providerEndpoint === 'string' && options.providerEndpoint.trim()) {
+		onlyList.push(options.providerEndpoint.trim());
+	}
+	if (options.customProvidersOnly && typeof options.customProvidersOnly === 'string') {
+		const customOnly = options.customProvidersOnly.split(',').map((s: string) => s.trim()).filter(Boolean);
+		for (const o of customOnly) {
+			if (!onlyList.includes(o)) onlyList.push(o);
+		}
+	}
+	if (onlyList.length > 0) {
+		provider.only = onlyList;
+	}
+
+	if (options.customProviderOrder && typeof options.customProviderOrder === 'string') {
+		const order = options.customProviderOrder.split(',').map((s: string) => s.trim()).filter(Boolean);
+		if (order.length > 0) provider.order = order;
+	}
+
+	if (options.customProvidersIgnore && typeof options.customProvidersIgnore === 'string') {
+		const ignore = options.customProvidersIgnore.split(',').map((s: string) => s.trim()).filter(Boolean);
+		if (ignore.length > 0) provider.ignore = ignore;
+	}
+
+	// Only inject allow_fallbacks when explicitly false (strict pinning).
+	// Default true matches OpenRouter's own default — no need to pollute every request.
+	if (options.allowFallbacks === false) {
+		provider.allow_fallbacks = false;
+	}
+
+	if (options.providerSort && options.providerSort !== 'default') {
+		provider.sort = options.providerSort;
+	}
+
+	if (options.dataCollection && options.dataCollection !== 'default') {
+		provider.data_collection = options.dataCollection;
+	}
+
+	const result: { provider?: Record<string, unknown>; service_tier?: string } = {};
+	if (Object.keys(provider).length > 0) {
+		result.provider = provider;
+	}
+	if (options.serviceTier && options.serviceTier !== 'auto') {
+		result.service_tier = options.serviceTier;
+	}
+	return result;
+}
+
 export class OpenRouter implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'OpenRouter',
@@ -311,6 +362,133 @@ export class OpenRouter implements INodeType {
 						default: 1,
 						description: 'Controls diversity via nucleus sampling',
 					},
+					{
+						displayName: 'Provider / Endpoint',
+						name: 'providerEndpoint',
+						type: 'options',
+						typeOptions: {
+							loadOptionsMethod: 'getProviders',
+							loadOptionsDependsOn: ['model'],
+						},
+						default: '',
+						description:
+							'Route requests to a specific provider endpoint for this model. <a href="https://openrouter.ai/docs/features/provider-routing">Learn more</a>.',
+					},
+					{
+						displayName: 'Allow Fallbacks',
+						name: 'allowFallbacks',
+						type: 'boolean',
+						default: true,
+						description:
+							'Whether to allow fallback to other providers if the selected provider is unavailable or rate-limited. Set to false to pin strictly.',
+					},
+					{
+						displayName: 'Service Tier',
+						name: 'serviceTier',
+						type: 'options',
+						default: 'auto',
+						description:
+							'Select an inference service tier. Flex tier offers significant cost savings.',
+						options: [
+							{
+								name: 'Auto (Default)',
+								value: 'auto',
+								description: 'Standard routing without forcing a service tier',
+							},
+							{
+								name: 'Flex',
+								value: 'flex',
+								description:
+									'Route to flex pricing endpoints (e.g. Google AI Studio Flex) for lowest costs',
+							},
+							{
+								name: 'Priority',
+								value: 'priority',
+								description:
+									'Route to priority endpoints for higher throughput and reduced queueing',
+							},
+						],
+					},
+					{
+						displayName: 'Custom Providers (Only)',
+						name: 'customProvidersOnly',
+						type: 'string',
+						default: '',
+						placeholder: 'e.g. google-ai-studio/flex, deepinfra',
+						description:
+							'Comma-separated list of provider slugs or tags to restrict routing to (sets \'provider.only\')',
+					},
+					{
+						displayName: 'Custom Provider Order',
+						name: 'customProviderOrder',
+						type: 'string',
+						default: '',
+						placeholder: 'e.g. Google AI Studio, Google Vertex',
+						description:
+							'Comma-separated list of provider names or slugs in order of priority (sets \'provider.order\')',
+					},
+					{
+						displayName: 'Ignore Providers',
+						name: 'customProvidersIgnore',
+						type: 'string',
+						default: '',
+						placeholder: 'e.g. together, fireworks',
+						description:
+							'Comma-separated list of provider names or slugs to skip (sets \'provider.ignore\')',
+					},
+					{
+						displayName: 'Provider Sort',
+						name: 'providerSort',
+						type: 'options',
+						default: 'default',
+						description: 'How to sort providers dynamically when routing',
+						options: [
+							{
+								name: 'Default',
+								value: 'default',
+								description: 'Use OpenRouter default sorting',
+							},
+							{
+								name: 'Price (Lowest First)',
+								value: 'price',
+								description: 'Sort providers by lowest price first',
+							},
+							{
+								name: 'Throughput (Fastest First)',
+								value: 'throughput',
+								description: 'Sort providers by highest token throughput',
+							},
+							{
+								name: 'Latency (Lowest TTFT)',
+								value: 'latency',
+								description: 'Sort providers by lowest time-to-first-token',
+							},
+						],
+					},
+					{
+						displayName: 'Data Collection Policy',
+						name: 'dataCollection',
+						type: 'options',
+						default: 'default',
+						description: 'Whether to allow or deny providers that may retain or train on data',
+						options: [
+							{
+								name: 'Default',
+								value: 'default',
+								description: 'Allow according to OpenRouter account settings',
+							},
+							{
+								name: 'Deny (Zero Data Retention)',
+								value: 'deny',
+								description: 'Only route to providers with zero data retention policies',
+							},
+							{
+								name: 'Allow',
+								value: 'allow',
+								description: 'Allow providers regardless of retention policy',
+							},
+						],
+					},
 				],
 			},
 		],
@@ -366,6 +544,132 @@ export class OpenRouter implements INodeType {
 				return { results };
 			},
 		},
+		loadOptions: {
+			async getProviders(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = (await this.getCredentials('openRouterCommunityApi')) as {
+					apiKey: string;
+					siteUrl?: string;
+					appName?: string;
+				};
+
+				let model = '';
+				try {
+					const modelParam = this.getNodeParameter('model', 0) as any;
+					if (typeof modelParam === 'object' && modelParam !== null && 'value' in modelParam) {
+						model = (modelParam.value || '').toString().trim();
+					} else if (typeof modelParam === 'string') {
+						model = modelParam.trim();
+					}
+				} catch {
+					try {
+						const modelParam = this.getCurrentNodeParameter('model') as any;
+						if (typeof modelParam === 'object' && modelParam !== null && 'value' in modelParam) {
+							model = (modelParam.value || '').toString().trim();
+						} else if (typeof modelParam === 'string') {
+							model = modelParam.trim();
+						}
+					} catch {}
+				}
+
+				if (!model) {
+					return [
+						{
+							name: 'Default / Auto (Select a model above first)',
+							value: '',
+							description: 'OpenRouter will route requests automatically',
+						},
+					];
+				}
+
+				const cleanModel = model.startsWith('~') ? model.substring(1) : model;
+				const url = `https://openrouter.ai/api/v1/models/${cleanModel}/endpoints`;
+
+				try {
+					const headers: Record<string, string> = {
+						'HTTP-Referer': credentials?.siteUrl || 'https://n8n.io',
+						'X-Title': credentials?.appName || 'n8n OpenRouter Node',
+					};
+					if (credentials?.apiKey) {
+						headers.Authorization = `Bearer ${credentials.apiKey}`;
+					}
+
+					const response = await this.helpers.request({
+						method: 'GET',
+						url,
+						headers,
+						json: true,
+					});
+
+					const endpoints = response?.data?.endpoints || [];
+					if (!Array.isArray(endpoints) || endpoints.length === 0) {
+						return [
+							{
+								name: 'Default / Auto (No distinct endpoints found for this model)',
+								value: '',
+								description:
+									'OpenRouter routes automatically. You can also specify Custom Providers (Only) below.',
+							},
+						];
+					}
+
+					const options: INodePropertyOptions[] = [
+						{
+							name: 'Default / Auto (OpenRouter automatic routing)',
+							value: '',
+							description: 'Allow OpenRouter to select the best provider automatically',
+						},
+					];
+
+					for (const ep of endpoints) {
+						const tag = ep.tag || '';
+						if (!tag) continue;
+						const providerName = ep.provider_name || 'Unknown Provider';
+						const quant =
+							ep.quantization && ep.quantization !== 'unknown' ? ` [${ep.quantization}]` : '';
+
+						const promptPerM = ep.pricing?.prompt
+							? (parseFloat(ep.pricing.prompt) * 1_000_000).toFixed(2)
+							: '';
+						const compPerM = ep.pricing?.completion
+							? (parseFloat(ep.pricing.completion) * 1_000_000).toFixed(2)
+							: '';
+						const pricingStr =
+							promptPerM && compPerM ? ` ($${promptPerM} / $${compPerM} per 1M tokens)` : '';
+
+						let label = `${providerName}: ${tag}${quant}${pricingStr}`;
+						if (tag.includes('/flex') && !label.includes('Flex')) {
+							label = `${providerName} (Flex): ${tag}${quant}${pricingStr}`;
+						} else if (tag.includes('/priority') && !label.includes('Priority')) {
+							label = `${providerName} (Priority): ${tag}${quant}${pricingStr}`;
+						}
+
+						const uptime =
+							ep.uptime_last_1d !== null && ep.uptime_last_1d !== undefined
+								? ` | 24h Uptime: ${Number(ep.uptime_last_1d).toFixed(1)}%`
+								: '';
+						const contextLen = ep.context_length
+							? ` | Context: ${ep.context_length.toLocaleString()}`
+							: '';
+
+						options.push({
+							name: label,
+							value: tag,
+							description: `Provider: ${providerName} | Tag: ${tag}${contextLen}${uptime}`,
+						});
+					}
+
+					return options;
+				} catch (error) {
+					return [
+						{
+							name: 'Default / Auto (Could not fetch endpoints)',
+							value: '',
+							description: 'Check model parameter or network connection',
+						},
+					];
+				}
+			},
+		},
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
@@ -406,6 +710,10 @@ export class OpenRouter implements INodeType {
 					if (options.temperature !== undefined) body.temperature = options.temperature;
 					if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens;
 					if (options.topP !== undefined) body.top_p = options.topP;
+
+					const routing = buildProviderRouting(options);
+					if (routing.provider) body.provider = routing.provider;
+					if (routing.service_tier) body.service_tier = routing.service_tier;
 
 					const response = await this.helpers.request({
 						method: 'POST',
@@ -501,6 +809,10 @@ export class OpenRouter implements INodeType {
 					if (options.temperature !== undefined) body.temperature = options.temperature;
 					if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens;
 					if (options.topP !== undefined) body.top_p = options.topP;
+
+					const routing = buildProviderRouting(options);
+					if (routing.provider) body.provider = routing.provider;
+					if (routing.service_tier) body.service_tier = routing.service_tier;
 
 					const response = await this.helpers.request({
 						method: 'POST',

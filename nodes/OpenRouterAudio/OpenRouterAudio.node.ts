@@ -401,35 +401,39 @@ export class OpenRouterAudio implements INodeType {
 	methods = {
 		listSearch: {
 			async searchModels(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
-				const credentials = await this.getCredentials('openRouterCommunityApi');
-				const operation = this.getNodeParameter('operation', undefined) as string;
-				const modality = operation === 'speechToText' ? 'transcription' : 'speech';
+				try {
+					const credentials = await this.getCredentials('openRouterCommunityApi');
+					const operation = this.getNodeParameter('operation', undefined) as string;
+					const modality = operation === 'speechToText' ? 'transcription' : 'speech';
 
-				const response = await this.helpers.request({
-					method: 'GET',
-					url: `https://openrouter.ai/api/v1/models?output_modalities=${modality}`,
-					headers: {
-						Authorization: `Bearer ${credentials.apiKey}`,
-					},
-					json: true,
-				});
+					const response = await this.helpers.request({
+						method: 'GET',
+						url: `https://openrouter.ai/api/v1/models?output_modalities=${modality}`,
+						headers: {
+							Authorization: `Bearer ${credentials.apiKey}`,
+						},
+						json: true,
+					});
 
-				const models = response.data || [];
-				let results = models.map((m: any) => ({
-					name: m.id.startsWith('~') ? m.id.substring(1) : m.id,
-					value: m.id,
-				}));
+					const models = response.data || [];
+					let results = models.map((m: any) => ({
+						name: m.id.startsWith('~') ? m.id.substring(1) : m.id,
+						value: m.id,
+					}));
 
-				results.sort((a: any, b: any) => a.name.localeCompare(b.name));
+					results.sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-				if (filter) {
-					const f = filter.toLowerCase();
-					results = results.filter(
-						(m: any) => m.name.toLowerCase().includes(f) || m.value.toLowerCase().includes(f),
-					);
+					if (filter) {
+						const f = filter.toLowerCase();
+						results = results.filter(
+							(m: any) => m.name.toLowerCase().includes(f) || m.value.toLowerCase().includes(f),
+						);
+					}
+
+					return { results };
+				} catch {
+					return { results: [] };
 				}
-
-				return { results };
 			},
 		},
 	};
@@ -489,10 +493,13 @@ export class OpenRouterAudio implements INodeType {
 							const binaryBuffer = await this.helpers.getBinaryDataBuffer(i, cloneBinaryProp);
 							const mimeType = binaryData.mimeType || 'audio/wav';
 							const base64 = binaryBuffer.toString('base64');
+							// OpenAI TTS spec: raw base64 + explicit format field (NOT data URI)
+							const audioFormat = (mimeType.includes('wav') || binaryData.fileExtension === 'wav') ? 'wav' : 'mp3';
 							references.push({
 								type: 'input_audio',
 								input_audio: {
-									data: `data:${mimeType};base64,${base64}`,
+									data: base64,
+									format: audioFormat,
 								},
 							});
 						}

@@ -590,22 +590,6 @@ export class OpenRouterDecisions implements INodeType {
 				return { results };
 			},
 		},
-		loadOptions: {
-			async getModels(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
-				const searchRes = await (this as any).methods?.listSearch?.searchModels?.call(this);
-				if (searchRes?.results) {
-					return searchRes.results.map((r: any) => ({
-						name: r.name,
-						value: r.value,
-						description: r.description,
-					}));
-				}
-				return [
-					{ name: 'TypeSafe: Jev 1.13 (typesafe/jev-1.13)', value: 'typesafe/jev-1.13' },
-					{ name: 'TypeSafe: Jev Latest (~typesafe/jev-latest)', value: '~typesafe/jev-latest' },
-				];
-			},
-		},
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
@@ -827,8 +811,10 @@ export class OpenRouterDecisions implements INodeType {
 					questions,
 				};
 
-				if (options.allowFallbacks !== undefined) {
-					payload.provider = { allow_fallbacks: options.allowFallbacks };
+				// Only send allow_fallbacks when explicitly false (strict pinning).
+				// Default true is OpenRouter's own behavior — no need to send it.
+				if (options.allowFallbacks === false) {
+					payload.provider = { allow_fallbacks: false };
 				}
 
 				if (options.sessionId) {

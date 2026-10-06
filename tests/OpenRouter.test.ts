@@ -1,6 +1,6 @@
 import { mock } from 'jest-mock-extended';
 import { IExecuteFunctions, INodeExecutionData } from 'n8n-workflow';
-import { OpenRouter } from '../nodes/OpenRouter/OpenRouter.node';
+import { OpenRouter, buildProviderRouting } from '../nodes/OpenRouter/OpenRouter.node';
 
 describe('OpenRouter Node', () => {
 	let node: OpenRouter;
@@ -479,6 +479,97 @@ describe('OpenRouter Node', () => {
 			);
 			expect(result.results).toHaveLength(1);
 			expect(result.results[0].value).toBe('multimodal-model');
+		});
+	});
+
+	describe('Provider Routing', () => {
+		it('should build provider routing config correctly with buildProviderRouting', () => {
+			const options = {
+				providerEndpoint: 'google-ai-studio/flex',
+				allowFallbacks: false,
+				serviceTier: 'flex',
+				customProvidersOnly: 'deepinfra, groq',
+				customProviderOrder: 'Google AI Studio, Together',
+				customProvidersIgnore: 'fireworks',
+				providerSort: 'price',
+				dataCollection: 'deny',
+			};
+
+			const result = buildProviderRouting(options);
+			expect(result.provider).toEqual({
+				only: ['google-ai-studio/flex', 'deepinfra', 'groq'],
+				order: ['Google AI Studio', 'Together'],
+				ignore: ['fireworks'],
+				allow_fallbacks: false,
+				sort: 'price',
+				data_collection: 'deny',
+			});
+			expect(result.service_tier).toBe('flex');
+		});
+
+		it('should include provider routing in chat completion payload when executing message operation', async () => {
+			const mockExecuteFunctions = createMockExecuteFunctions();
+
+			mockExecuteFunctions.getNodeParameter.mockImplementation((paramName: string) => {
+				if (paramName === 'operation') return 'message';
+				if (paramName === 'prompt') return 'Hello';
+				if (paramName === 'model') return 'google/gemini-2.5-flash';
+				if (paramName === 'systemPrompt') return '';
+				if (paramName === 'options') {
+					return {
+						providerEndpoint: 'google-ai-studio/flex',
+						allowFallbacks: false,
+						serviceTier: 'flex',
+					};
+				}
+				return undefined;
+			});
+
+			(mockExecuteFunctions.helpers.request as jest.Mock).mockResolvedValue({
+				choices: [{ message: { content: 'Hi there' } }],
+			});
+
+			await node.execute.call(mockExecuteFunctions);
+
+			expect(mockExecuteFunctions.helpers.request).toHaveBeenCalledWith(
+				expect.objectContaining({
+					body: expect.objectContaining({
+						model: 'google/gemini-2.5-flash',
+						provider: {
+							only: ['google-ai-studio/flex'],
+							allow_fallbacks: false,
+						},
+						service_tier: 'flex',
+					}),
+				}),
+			);
+		});
+
+		it('should format endpoints in loadOptions.getProviders correctly', async () => {
+			const fakeContext = {
+				getCredentials: jest.fn().mockResolvedValue({ apiKey: 'mock-key' }),
+				getNodeParameter: jest.fn().mockReturnValue('google/gemini-2.5-flash'),
+				getCurrentNodeParameter: jest.fn().mockReturnValue('google/gemini-2.5-flash'),
+				helpers: {
+					request: jest.fn().mockResolvedValue({
+						data: {
+							endpoints: [
+								{
+									tag: 'google-ai-studio/flex',
+									provider_name: 'Google AI Studio',
+									pricing: { prompt: '0.00000015', completion: '0.00000125' },
+								},
+							],
+						},
+					}),
+				},
+			} as any;
+
+			const result = await node.methods.loadOptions.getProviders.call(fakeContext);
+			expect(result).toHaveLength(2);
+			expect(result[0].value).toBe('');
+			expect(result[1].value).toBe('google-ai-studio/flex');
+			expect(result[1].name).toContain('Google AI Studio (Flex)');
 		});
 	});
 });

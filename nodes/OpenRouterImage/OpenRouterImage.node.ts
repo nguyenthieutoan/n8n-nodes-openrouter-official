@@ -305,30 +305,34 @@ export class OpenRouterImage implements INodeType {
 	methods = {
 		listSearch: {
 			async searchModels(this: ILoadOptionsFunctions, filter?: string): Promise<INodeListSearchResult> {
-				const credentials = await this.getCredentials('openRouterCommunityApi');
-				const response = await this.helpers.request({
-					method: 'GET',
-					url: 'https://openrouter.ai/api/v1/models?output_modalities=image',
-					headers: {
-						Authorization: `Bearer ${credentials.apiKey}`,
-					},
-					json: true,
-				});
+				try {
+					const credentials = await this.getCredentials('openRouterCommunityApi');
+					const response = await this.helpers.request({
+						method: 'GET',
+						url: 'https://openrouter.ai/api/v1/models?output_modalities=image',
+						headers: {
+							Authorization: `Bearer ${credentials.apiKey}`,
+						},
+						json: true,
+					});
 
-				const models = response.data || [];
-				let results = models.map((m: any) => ({
-					name: m.id.startsWith('~') ? m.id.substring(1) : m.id,
-					value: m.id,
-				}));
+					const models = response.data || [];
+					let results = models.map((m: any) => ({
+						name: m.id.startsWith('~') ? m.id.substring(1) : m.id,
+						value: m.id,
+					}));
 
-				results.sort((a: any, b: any) => a.name.localeCompare(b.name));
+					results.sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-				if (filter) {
-					const f = filter.toLowerCase();
-					results = results.filter((m: any) => m.name.toLowerCase().includes(f) || m.value.toLowerCase().includes(f));
+					if (filter) {
+						const f = filter.toLowerCase();
+						results = results.filter((m: any) => m.name.toLowerCase().includes(f) || m.value.toLowerCase().includes(f));
+					}
+
+					return { results };
+				} catch {
+					return { results: [] };
 				}
-
-				return { results };
 			},
 		},
 	};
@@ -415,7 +419,8 @@ export class OpenRouterImage implements INodeType {
 				if (options.aspectRatio && options.aspectRatio !== 'auto') {
 					body.aspect_ratio = options.aspectRatio;
 				}
-				if (options.resolution) {
+				// Only send resolution when user explicitly changes from the default '1K'
+				if (options.resolution && options.resolution !== '1K') {
 					body.resolution = options.resolution;
 				}
 				if (options.size && typeof options.size === 'string' && options.size.trim()) {

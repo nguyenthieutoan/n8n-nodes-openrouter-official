@@ -157,7 +157,8 @@ describe('OpenRouterAudio Node', () => {
 							{
 								type: 'input_audio',
 								input_audio: {
-									data: `data:audio/wav;base64,${Buffer.from('mock-audio-bytes').toString('base64')}`,
+									data: Buffer.from('mock-audio-bytes').toString('base64'),
+									format: 'wav',
 								},
 							},
 							{

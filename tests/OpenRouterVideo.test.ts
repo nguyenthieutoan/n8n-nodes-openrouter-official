@@ -64,6 +64,7 @@ describe('OpenRouterVideo', () => {
 		expect(optionNames).toContain('seed');
 		expect(optionNames).toContain('downloadVideo');
 		expect(optionNames).toContain('pollTimeoutSecs');
+		expect(optionNames).toContain('waitForCompletion');
 	});
 
 	it('should implement searchModels listSearch method', () => {

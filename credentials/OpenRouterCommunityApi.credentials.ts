@@ -40,8 +40,8 @@ export class OpenRouterCommunityApi implements ICredentialType {
 		properties: {
 			headers: {
 				Authorization: '={{"Bearer " + $credentials.apiKey}}',
-				'HTTP-Referer': '={{$credentials.siteUrl}}',
-				'X-Title': '={{$credentials.appName}}',
+				'HTTP-Referer': '={{$credentials.siteUrl || "https://n8n.io"}}',
+				'X-Title': '={{$credentials.appName || "n8n OpenRouter Community"}}',
 			},
 		},
 	};

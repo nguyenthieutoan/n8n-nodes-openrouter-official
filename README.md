@@ -31,10 +31,15 @@ n8n's native embedding options are highly restricted (mostly defaulting to OpenA
 Retrieval alone often yields irrelevant context, leading to hallucinations. Native n8n severely lacks accessible, high-quality Rerankers (often forcing you to use Cohere).
 * **The Solution:** This node brings OpenRouter into the `Document Compressor` layer of n8n. You can now use any advanced reasoning LLM on OpenRouter to **rerank, score, and compress** your retrieved documents before they reach your final Agent. This drastically increases RAG accuracy and reduces token costs for the final generation step.
 
-### 4. `OpenRouterCacheChatModel` Node (LangChain AI Language Model with Prompt Caching)
-Repeatedly sending large system prompts, extensive documentation, or few-shot examples to generative LLMs in n8n AI Agents leads to unnecessary token costs and slow response times.
-* **The Solution:** A high-performance Chat Model node for n8n AI Agents and chains featuring **automatic Prompt Caching injection** (`cache_control: { type: "ephemeral" }`).
+### 4. `OpenRouterCacheChatModel` Node (LangChain AI Language Model with Prompt Caching & Provider Pinning)
+Repeatedly sending large system prompts, extensive documentation, or few-shot examples to generative LLMs in n8n AI Agents leads to unnecessary token costs and slow response times. Furthermore, OpenRouter often routes requests across different backend providers (e.g., Google AI Studio vs. Google Vertex), which have different prices and service tiers.
+* **The Solution:** A high-performance Chat Model node for n8n AI Agents and chains featuring **automatic Prompt Caching injection** (`cache_control: { type: "ephemeral" }`) and **advanced Provider Routing & Pinning**.
 * **Smart Breakpoints:** Intelligently tags system messages and previous user conversation turns to trigger cache hits on supported OpenRouter providers (Anthropic, DeepSeek, Google, etc.).
+* **Provider Routing & Pinning:**
+  - **Dynamic Endpoint Selector:** Select specific provider endpoints directly from a dynamic dropdown (e.g., `Google AI Studio (Flex)` [0.15$/M prompt], `Google Vertex (Global)`, etc.) complete with real-time pricing per 1M tokens.
+  - **Strict Pinning (`Allow Fallbacks: false`):** Lock down inference exclusively to your chosen provider/endpoint. If the provider runs out of quota or experiences rate limits, the request fails immediately rather than silently falling back to a more expensive tier or different provider.
+  - **Service Tier Support:** Directly select `Flex` tier for substantial cost savings or `Priority` tier for reduced latency.
+  - **Custom Provider Routing:** Configure `Custom Providers (Only)`, `Custom Provider Order`, `Ignore Providers`, dynamic sorting (`Price`, `Throughput`, `Latency`), and zero-data-retention policy compliance (`Data Collection: Deny`).
 * **Cost & Latency Optimization:** Slashes recurring prompt token costs by up to 90% and dramatically cuts Time-to-First-Token (TTFT) for complex agentic workflows.
 
 ### 5. `OpenRouter Decisions (System One)` Node
@@ -108,7 +113,7 @@ n8n-nodes-openrouter-official
 | **OpenRouter Decisions (System One)** | Standard Action Node | Fast, typed, probabilistic decision-making (Choice, Noul, Score) using live System One models on OpenRouter. |
 | **OpenRouter Embeddings** | Advanced AI (LangChain) | Generate vector embeddings using any supported OpenRouter model for your Vector Stores. |
 | **OpenRouter Reranker** | Advanced AI (LangChain) | Rerank and compress documents dynamically in RAG workflows to boost context accuracy. |
-| **OpenRouter Cache Chat Model** | Advanced AI (LangChain) | Chat model with prompt caching support to cut token costs and reduce latency. |
+| **OpenRouter Cache Chat Model** | Advanced AI (LangChain) | Chat model with prompt caching and strict provider routing/pinning (Flex tier, fallback control). |
 
 ## 🎯 OpenRouter Decisions (System One) — Rapid Probabilistic Decisions
 

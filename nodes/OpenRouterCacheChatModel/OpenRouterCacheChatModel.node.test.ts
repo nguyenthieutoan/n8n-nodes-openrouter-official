@@ -1,7 +1,9 @@
 import {
 	injectCacheControl,
+	injectProviderRouting,
 	fixEmptyToolCallArguments,
 	createCachingOpenRouterFetch,
+	OpenRouterCacheChatModel,
 } from './OpenRouterCacheChatModel.node';
 
 function jsonResponse(body: unknown): Response {
@@ -391,5 +393,201 @@ describe('createCachingOpenRouterFetch', () => {
 		await wrappedFetch('https://openrouter.ai/api/v1/models');
 
 		expect(mockFetch).toHaveBeenCalled();
+	});
+
+	it('should inject provider routing and service_tier into request body', async () => {
+		let capturedBody: string | undefined;
+		const mockFetch = jest.fn(async (_input: any, init: any) => {
+			capturedBody = init?.body;
+			return jsonResponse({ choices: [{ message: { content: 'Response' } }] });
+		}) as unknown as typeof globalThis.fetch;
+
+		const routingConfig = {
+			endpoint: 'google-ai-studio/flex',
+			allow_fallbacks: false,
+			service_tier: 'flex',
+		};
+
+		const wrappedFetch = createCachingOpenRouterFetch(mockFetch, cacheConfig, routingConfig);
+		await wrappedFetch('https://openrouter.ai/api/v1/chat/completions', {
+			method: 'POST',
+			body: JSON.stringify({
+				model: 'google/gemini-2.5-flash',
+				messages: [{ role: 'user', content: 'Test' }],
+			}),
+		});
+
+		const parsed = JSON.parse(capturedBody!);
+		expect(parsed.provider).toEqual({
+			only: ['google-ai-studio/flex'],
+			allow_fallbacks: false,
+		});
+		expect(parsed.service_tier).toBe('flex');
+	});
+});
+
+describe('injectProviderRouting', () => {
+	it('should return original body if no routingConfig provided', () => {
+		const body = { model: 'google/gemini-2.5-flash', messages: [] };
+		const result = injectProviderRouting(body);
+		expect(result).toBe(body);
+		expect(result.provider).toBeUndefined();
+	});
+
+	it('should pin provider.only and allow_fallbacks: false (Method 1: Strict Pinning)', () => {
+		const body = { model: 'google/gemini-2.5-flash', messages: [] };
+		const result = injectProviderRouting(body, {
+			endpoint: 'google-ai-studio/flex',
+			allow_fallbacks: false,
+		});
+
+		expect(result.provider).toEqual({
+			only: ['google-ai-studio/flex'],
+			allow_fallbacks: false,
+		});
+		expect(result.service_tier).toBeUndefined();
+	});
+
+	it('should support provider.order, allow_fallbacks, and service_tier (Method 2: Priority + Flex Tier)', () => {
+		const body = { model: 'google/gemini-2.5-flash', messages: [] };
+		const result = injectProviderRouting(body, {
+			order: ['Google AI Studio'],
+			allow_fallbacks: false,
+			service_tier: 'flex',
+		});
+
+		expect(result.provider).toEqual({
+			order: ['Google AI Studio'],
+			allow_fallbacks: false,
+		});
+		expect(result.service_tier).toBe('flex');
+	});
+
+	it('should combine endpoint and custom only providers', () => {
+		const body = { model: 'test', messages: [] };
+		const result = injectProviderRouting(body, {
+			endpoint: 'google-ai-studio/flex',
+			only: ['deepinfra', 'groq'],
+			ignore: ['together'],
+			sort: 'price',
+			data_collection: 'deny',
+		});
+
+		expect(result.provider).toEqual({
+			only: ['google-ai-studio/flex', 'deepinfra', 'groq'],
+			ignore: ['together'],
+			sort: 'price',
+			data_collection: 'deny',
+		});
+	});
+
+	it('should not duplicate endpoint if already in only list', () => {
+		const body = { model: 'test', messages: [] };
+		const result = injectProviderRouting(body, {
+			endpoint: 'google-ai-studio/flex',
+			only: ['google-ai-studio/flex', 'deepinfra'],
+		});
+
+		expect((result.provider as any).only).toEqual(['google-ai-studio/flex', 'deepinfra']);
+	});
+
+	it('should ignore default/auto values without polluting body', () => {
+		const body = { model: 'test', messages: [] };
+		const result = injectProviderRouting(body, {
+			service_tier: 'auto',
+			sort: 'default',
+		});
+
+		expect(result.provider).toBeUndefined();
+		expect(result.service_tier).toBeUndefined();
+	});
+});
+
+describe('OpenRouterCacheChatModel loadOptions.getProviders', () => {
+	const node = new OpenRouterCacheChatModel();
+
+	it('should return guidance item when no model is selected', async () => {
+		const fakeContext: any = {
+			getCredentials: jest.fn().mockResolvedValue({ apiKey: 'test-key' }),
+			getNodeParameter: jest.fn().mockImplementation((name: string) => {
+				if (name === 'model') return '';
+				return '';
+			}),
+			getCurrentNodeParameter: jest.fn().mockReturnValue(''),
+			helpers: {
+				request: jest.fn(),
+			},
+		};
+
+		const result = await node.methods.loadOptions.getProviders.call(fakeContext);
+		expect(result).toHaveLength(1);
+		expect(result[0].value).toBe('');
+		expect(result[0].name).toContain('Select a model above first');
+	});
+
+	it('should fetch and format endpoints correctly from OpenRouter API', async () => {
+		const fakeEndpoints = [
+			{
+				tag: 'google-ai-studio/flex',
+				provider_name: 'Google AI Studio',
+				pricing: { prompt: '0.00000015', completion: '0.00000125' },
+				context_length: 1048576,
+				uptime_last_1d: 99.98,
+			},
+			{
+				tag: 'google-vertex/global',
+				provider_name: 'Google',
+				pricing: { prompt: '0.0000003', completion: '0.0000025' },
+				context_length: 1048576,
+				uptime_last_1d: 99.38,
+			},
+		];
+
+		const fakeContext: any = {
+			getCredentials: jest.fn().mockResolvedValue({ apiKey: 'test-key' }),
+			getNodeParameter: jest.fn().mockReturnValue('google/gemini-2.5-flash'),
+			getCurrentNodeParameter: jest.fn().mockReturnValue('google/gemini-2.5-flash'),
+			helpers: {
+				request: jest.fn().mockResolvedValue({
+					data: { endpoints: fakeEndpoints },
+				}),
+			},
+		};
+
+		const result = await node.methods.loadOptions.getProviders.call(fakeContext);
+		expect(fakeContext.helpers.request).toHaveBeenCalledWith(
+			expect.objectContaining({
+				url: 'https://openrouter.ai/api/v1/models/google/gemini-2.5-flash/endpoints',
+			}),
+		);
+
+		// First item is Default / Auto
+		expect(result[0].value).toBe('');
+		expect(result[0].name).toContain('Default / Auto');
+
+		// Second item is Google AI Studio (Flex)
+		expect(result[1].value).toBe('google-ai-studio/flex');
+		expect(result[1].name).toContain('Google AI Studio (Flex)');
+		expect(result[1].name).toContain('$0.15 / $1.25 per 1M tokens');
+
+		// Third item is Google: google-vertex/global
+		expect(result[2].value).toBe('google-vertex/global');
+		expect(result[2].name).toContain('Google: google-vertex/global');
+	});
+
+	it('should handle API errors gracefully', async () => {
+		const fakeContext: any = {
+			getCredentials: jest.fn().mockResolvedValue({ apiKey: 'test-key' }),
+			getNodeParameter: jest.fn().mockReturnValue('google/gemini-2.5-flash'),
+			getCurrentNodeParameter: jest.fn().mockReturnValue('google/gemini-2.5-flash'),
+			helpers: {
+				request: jest.fn().mockRejectedValue(new Error('Network error')),
+			},
+		};
+
+		const result = await node.methods.loadOptions.getProviders.call(fakeContext);
+		expect(result).toHaveLength(1);
+		expect(result[0].value).toBe('');
+		expect(result[0].name).toContain('Could not fetch endpoints');
 	});
 });

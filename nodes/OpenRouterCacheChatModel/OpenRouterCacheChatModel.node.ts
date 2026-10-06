@@ -2,6 +2,8 @@ import type { ChatOpenAI as ChatOpenAIType, ClientOptions } from '@langchain/ope
 import * as path from 'path';
 import {
 	NodeConnectionTypes,
+	type ILoadOptionsFunctions,
+	type INodePropertyOptions,
 	type INodeType,
 	type INodeTypeDescription,
 	type ISupplyDataFunctions,
@@ -12,6 +14,17 @@ interface CacheConfig {
 	enabled: boolean;
 	ttl: 'default' | '1h';
 	breakpoints: 'system' | 'system_and_last_user';
+}
+
+export interface ProviderRoutingConfig {
+	endpoint?: string;
+	only?: string[];
+	order?: string[];
+	ignore?: string[];
+	allow_fallbacks?: boolean;
+	service_tier?: string;
+	sort?: string;
+	data_collection?: 'allow' | 'deny';
 }
 
 interface ContentBlock {
@@ -28,6 +41,8 @@ interface ChatMessage {
 interface ChatRequestBody {
 	model?: string;
 	messages?: ChatMessage[];
+	provider?: Record<string, unknown>;
+	service_tier?: string;
 	[key: string]: unknown;
 }
 
@@ -90,6 +105,70 @@ export function injectCacheControl(body: ChatRequestBody, config: CacheConfig): 
 	return body;
 }
 
+export function injectProviderRouting(
+	body: ChatRequestBody,
+	routing?: ProviderRoutingConfig,
+): ChatRequestBody {
+	if (!routing) return body;
+
+	const provider: Record<string, unknown> =
+		typeof body.provider === 'object' && body.provider !== null
+			? { ...(body.provider as Record<string, unknown>) }
+			: {};
+
+	const onlyList: string[] = Array.isArray(provider.only) ? [...(provider.only as string[])] : [];
+
+	if (routing.endpoint && routing.endpoint.trim()) {
+		const ep = routing.endpoint.trim();
+		if (!onlyList.includes(ep)) {
+			onlyList.push(ep);
+		}
+	}
+
+	if (Array.isArray(routing.only)) {
+		for (const o of routing.only) {
+			const clean = typeof o === 'string' ? o.trim() : '';
+			if (clean && !onlyList.includes(clean)) {
+				onlyList.push(clean);
+			}
+		}
+	}
+
+	if (onlyList.length > 0) {
+		provider.only = onlyList;
+	}
+
+	if (Array.isArray(routing.order) && routing.order.length > 0) {
+		provider.order = routing.order;
+	}
+
+	if (Array.isArray(routing.ignore) && routing.ignore.length > 0) {
+		provider.ignore = routing.ignore;
+	}
+
+	if (routing.allow_fallbacks !== undefined) {
+		provider.allow_fallbacks = routing.allow_fallbacks;
+	}
+
+	if (routing.sort && routing.sort !== 'default') {
+		provider.sort = routing.sort;
+	}
+
+	if (routing.data_collection && (routing.data_collection === 'allow' || routing.data_collection === 'deny')) {
+		provider.data_collection = routing.data_collection;
+	}
+
+	if (Object.keys(provider).length > 0) {
+		body.provider = provider;
+	}
+
+	if (routing.service_tier && routing.service_tier !== 'auto') {
+		body.service_tier = routing.service_tier;
+	}
+
+	return body;
+}
+
 export function fixEmptyToolCallArguments(json: unknown): boolean {
 	if (!isOpenAIResponseWithChoices(json)) return false;
 
@@ -114,15 +193,21 @@ export function fixEmptyToolCallArguments(json: unknown): boolean {
 export function createCachingOpenRouterFetch(
 	baseFetch: typeof globalThis.fetch,
 	cacheConfig: CacheConfig,
+	routingConfig?: ProviderRoutingConfig,
 ): typeof globalThis.fetch {
 	return async (input, init) => {
 		let modifiedInit = init;
 
-		if (cacheConfig.enabled && init?.body && typeof init.body === 'string') {
+		if (init?.body && typeof init.body === 'string') {
 			try {
-				const body = JSON.parse(init.body) as ChatRequestBody;
-				const modified = injectCacheControl(body, cacheConfig);
-				modifiedInit = { ...init, body: JSON.stringify(modified) };
+				let body = JSON.parse(init.body) as ChatRequestBody;
+				if (cacheConfig.enabled) {
+					body = injectCacheControl(body, cacheConfig);
+				}
+				if (routingConfig) {
+					body = injectProviderRouting(body, routingConfig);
+				}
+				modifiedInit = { ...init, body: JSON.stringify(body) };
 			} catch {
 				// Parse failed — pass through unchanged
 			}
@@ -391,9 +476,260 @@ export class OpenRouterCacheChatModel implements INodeType {
 							'Controls diversity via nucleus sampling: 0.5 means half of all likelihood-weighted options are considered. We generally recommend altering this or temperature but not both.',
 						type: 'number',
 					},
+					{
+						displayName: 'Provider / Endpoint',
+						name: 'providerEndpoint',
+						type: 'options',
+						typeOptions: {
+							loadOptionsMethod: 'getProviders',
+							loadOptionsDependsOn: ['model'],
+						},
+						default: '',
+						description:
+							'Route requests to a specific provider endpoint for this model. <a href="https://openrouter.ai/docs/features/provider-routing">Learn more</a>.',
+					},
+					{
+						displayName: 'Allow Fallbacks',
+						name: 'allowFallbacks',
+						type: 'boolean',
+						default: true,
+						description:
+							'Whether to allow fallback to other providers if the selected provider is unavailable or rate-limited. Set to false to pin strictly.',
+					},
+					{
+						displayName: 'Service Tier',
+						name: 'serviceTier',
+						type: 'options',
+						default: 'auto',
+						description:
+							'Select an inference service tier. Flex tier offers significant cost savings.',
+						options: [
+							{
+								name: 'Auto (Default)',
+								value: 'auto',
+								description: 'Standard routing without forcing a service tier',
+							},
+							{
+								name: 'Flex',
+								value: 'flex',
+								description:
+									'Route to flex pricing endpoints (e.g. Google AI Studio Flex) for lowest costs',
+							},
+							{
+								name: 'Priority',
+								value: 'priority',
+								description:
+									'Route to priority endpoints for higher throughput and reduced queueing',
+							},
+						],
+					},
+					{
+						displayName: 'Custom Providers (Only)',
+						name: 'customProvidersOnly',
+						type: 'string',
+						default: '',
+						placeholder: 'e.g. google-ai-studio/flex, deepinfra',
+						description:
+							'Comma-separated list of provider slugs or tags to restrict routing to (sets \'provider.only\')',
+					},
+					{
+						displayName: 'Custom Provider Order',
+						name: 'customProviderOrder',
+						type: 'string',
+						default: '',
+						placeholder: 'e.g. Google AI Studio, Google Vertex',
+						description:
+							'Comma-separated list of provider names or slugs in order of priority (sets \'provider.order\')',
+					},
+					{
+						displayName: 'Ignore Providers',
+						name: 'customProvidersIgnore',
+						type: 'string',
+						default: '',
+						placeholder: 'e.g. together, fireworks',
+						description:
+							'Comma-separated list of provider names or slugs to skip (sets \'provider.ignore\')',
+					},
+					{
+						displayName: 'Provider Sort',
+						name: 'providerSort',
+						type: 'options',
+						default: 'default',
+						description: 'How to sort providers dynamically when routing',
+						options: [
+							{
+								name: 'Default',
+								value: 'default',
+								description: 'Use OpenRouter default sorting',
+							},
+							{
+								name: 'Price (Lowest First)',
+								value: 'price',
+								description: 'Sort providers by lowest price first',
+							},
+							{
+								name: 'Throughput (Fastest First)',
+								value: 'throughput',
+								description: 'Sort providers by highest token throughput',
+							},
+							{
+								name: 'Latency (Lowest TTFT)',
+								value: 'latency',
+								description: 'Sort providers by lowest time-to-first-token',
+							},
+						],
+					},
+					{
+						displayName: 'Data Collection Policy',
+						name: 'dataCollection',
+						type: 'options',
+						default: 'default',
+						description: 'Whether to allow or deny providers that may retain or train on data',
+						options: [
+							{
+								name: 'Default',
+								value: 'default',
+								description: 'Allow according to OpenRouter account settings',
+							},
+							{
+								name: 'Deny (Zero Data Retention)',
+								value: 'deny',
+								description: 'Only route to providers with zero data retention policies',
+							},
+							{
+								name: 'Allow',
+								value: 'allow',
+								description: 'Allow providers regardless of retention policy',
+							},
+						],
+					},
 				],
 			},
 		],
+	};
+
+	methods = {
+		loadOptions: {
+			async getProviders(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = (await this.getCredentials('openRouterCommunityApi')) as {
+					apiKey: string;
+					siteUrl?: string;
+					appName?: string;
+				};
+
+				let model = '';
+				try {
+					model = this.getNodeParameter('model', 0) as string;
+				} catch {
+					try {
+						model = this.getCurrentNodeParameter('model') as string;
+					} catch {}
+				}
+
+				if (typeof model === 'object' && model !== null && 'value' in model) {
+					model = (model as { value: string }).value;
+				}
+				model = String(model || '').trim();
+
+				if (!model) {
+					return [
+						{
+							name: 'Default / Auto (Select a model above first)',
+							value: '',
+							description: 'OpenRouter will route requests automatically',
+						},
+					];
+				}
+
+				const cleanModel = model.startsWith('~') ? model.substring(1) : model;
+				const url = `https://openrouter.ai/api/v1/models/${cleanModel}/endpoints`;
+
+				try {
+					const headers: Record<string, string> = {
+						'HTTP-Referer': credentials?.siteUrl || 'https://n8n.io',
+						'X-Title': credentials?.appName || 'n8n OpenRouter Node',
+					};
+					if (credentials?.apiKey) {
+						headers.Authorization = `Bearer ${credentials.apiKey}`;
+					}
+
+					const response = await this.helpers.request({
+						method: 'GET',
+						url,
+						headers,
+						json: true,
+					});
+
+					const endpoints = response?.data?.endpoints || [];
+					if (!Array.isArray(endpoints) || endpoints.length === 0) {
+						return [
+							{
+								name: 'Default / Auto (No distinct endpoints found for this model)',
+								value: '',
+								description:
+									'OpenRouter routes automatically. You can also specify Custom Providers (Only) below.',
+							},
+						];
+					}
+
+					const options: INodePropertyOptions[] = [
+						{
+							name: 'Default / Auto (OpenRouter automatic routing)',
+							value: '',
+							description: 'Allow OpenRouter to select the best provider automatically',
+						},
+					];
+
+					for (const ep of endpoints) {
+						const tag = ep.tag || '';
+						if (!tag) continue;
+						const providerName = ep.provider_name || 'Unknown Provider';
+						const quant =
+							ep.quantization && ep.quantization !== 'unknown' ? ` [${ep.quantization}]` : '';
+
+						const promptPerM = ep.pricing?.prompt
+							? (parseFloat(ep.pricing.prompt) * 1_000_000).toFixed(2)
+							: '';
+						const compPerM = ep.pricing?.completion
+							? (parseFloat(ep.pricing.completion) * 1_000_000).toFixed(2)
+							: '';
+						const pricingStr =
+							promptPerM && compPerM ? ` ($${promptPerM} / $${compPerM} per 1M tokens)` : '';
+
+						let label = `${providerName}: ${tag}${quant}${pricingStr}`;
+						if (tag.includes('/flex') && !label.includes('Flex')) {
+							label = `${providerName} (Flex): ${tag}${quant}${pricingStr}`;
+						} else if (tag.includes('/priority') && !label.includes('Priority')) {
+							label = `${providerName} (Priority): ${tag}${quant}${pricingStr}`;
+						}
+
+						const uptime =
+							ep.uptime_last_1d !== null && ep.uptime_last_1d !== undefined
+								? ` | 24h Uptime: ${Number(ep.uptime_last_1d).toFixed(1)}%`
+								: '';
+						const contextLen = ep.context_length
+							? ` | Context: ${ep.context_length.toLocaleString()}`
+							: '';
+
+						options.push({
+							name: label,
+							value: tag,
+							description: `Provider: ${providerName} | Tag: ${tag}${contextLen}${uptime}`,
+						});
+					}
+
+					return options;
+				} catch (error) {
+					return [
+						{
+							name: 'Default / Auto (Could not fetch endpoints)',
+							value: '',
+							description: 'Check model parameter or network connection',
+						},
+					];
+				}
+			},
+		},
 	};
 
 	async supplyData(this: ISupplyDataFunctions, itemIndex: number): Promise<SupplyData> {
@@ -417,6 +753,14 @@ export class OpenRouterCacheChatModel implements INodeType {
 			temperature?: number;
 			topP?: number;
 			responseFormat?: 'text' | 'json_object';
+			providerEndpoint?: string;
+			allowFallbacks?: boolean;
+			serviceTier?: string;
+			customProvidersOnly?: string;
+			customProviderOrder?: string;
+			customProvidersIgnore?: string;
+			providerSort?: string;
+			dataCollection?: 'allow' | 'deny' | 'default';
 		};
 
 		const cacheConfig: CacheConfig = {
@@ -425,6 +769,48 @@ export class OpenRouterCacheChatModel implements INodeType {
 			breakpoints: options.cacheBreakpoints ?? 'system',
 		};
 
+		const routingConfig: ProviderRoutingConfig = {};
+		if (options.providerEndpoint && options.providerEndpoint.trim()) {
+			routingConfig.endpoint = options.providerEndpoint.trim();
+		}
+		if (options.customProvidersOnly) {
+			const only = options.customProvidersOnly.split(',').map((s) => s.trim()).filter(Boolean);
+			if (only.length > 0) routingConfig.only = only;
+		}
+		if (options.customProviderOrder) {
+			const order = options.customProviderOrder.split(',').map((s) => s.trim()).filter(Boolean);
+			if (order.length > 0) routingConfig.order = order;
+		}
+		if (options.customProvidersIgnore) {
+			const ignore = options.customProvidersIgnore.split(',').map((s) => s.trim()).filter(Boolean);
+			if (ignore.length > 0) routingConfig.ignore = ignore;
+		}
+		// Only inject allow_fallbacks when explicitly set to false (strict pinning).
+		// Default true is OpenRouter's own default — no need to send it.
+		if (options.allowFallbacks === false) {
+			routingConfig.allow_fallbacks = false;
+		}
+		if (options.serviceTier && options.serviceTier !== 'auto') {
+			routingConfig.service_tier = options.serviceTier;
+		}
+		if (options.providerSort && options.providerSort !== 'default') {
+			routingConfig.sort = options.providerSort;
+		}
+		if (options.dataCollection && options.dataCollection !== 'default') {
+			routingConfig.data_collection = options.dataCollection as 'allow' | 'deny';
+		}
+
+		// Only pass routingConfig to fetch when it has at least one key.
+		// The fetch interceptor (createCachingOpenRouterFetch) is the single source of truth
+		// for injecting provider routing — do NOT also put it in modelKwargs to avoid double-inject.
+		const activeRoutingConfig: ProviderRoutingConfig | undefined =
+			Object.keys(routingConfig).length > 0 ? routingConfig : undefined;
+
+		const modelKwargs: Record<string, unknown> = {};
+		if (options.responseFormat) {
+			modelKwargs.response_format = { type: options.responseFormat };
+		}
+
 		const timeout = options.timeout;
 		const configuration: ClientOptions = {
 			baseURL: 'https://openrouter.ai/api/v1',
@@ -432,7 +818,7 @@ export class OpenRouterCacheChatModel implements INodeType {
 				'HTTP-Referer': credentials.siteUrl || 'https://n8n.io',
 				'X-Title': credentials.appName || 'n8n OpenRouter Node',
 			},
-			fetch: createCachingOpenRouterFetch(globalThis.fetch, cacheConfig),
+			fetch: createCachingOpenRouterFetch(globalThis.fetch, cacheConfig, activeRoutingConfig) as any,
 		};
 
 		const modelConfig: any = {
@@ -442,11 +828,7 @@ export class OpenRouterCacheChatModel implements INodeType {
 			timeout,
 			maxRetries: options.maxRetries ?? 2,
 			configuration,
-			modelKwargs: options.responseFormat
-				? {
-						response_format: { type: options.responseFormat },
-					}
-				: undefined,
+			modelKwargs: Object.keys(modelKwargs).length > 0 ? modelKwargs : undefined,
 		};
 
 		const aiUtilities = getAiUtilities();

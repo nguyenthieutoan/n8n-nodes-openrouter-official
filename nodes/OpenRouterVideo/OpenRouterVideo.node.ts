@@ -283,6 +283,14 @@ export class OpenRouterVideo implements INodeType {
 						default: 300,
 						description: 'Maximum time to wait for video generation to complete (30–600 seconds)',
 					},
+					{
+						displayName: 'Wait for Completion',
+						name: 'waitForCompletion',
+						type: 'boolean',
+						default: true,
+						description:
+							'Whether to wait and poll until the video finishes generating. When false, the node returns the job ID immediately after submission.',
+					},
 				],
 			},
 		],
@@ -294,34 +302,38 @@ export class OpenRouterVideo implements INodeType {
 				this: ILoadOptionsFunctions,
 				filter?: string,
 			): Promise<INodeListSearchResult> {
-				const credentials = await this.getCredentials('openRouterCommunityApi');
+				try {
+					const credentials = await this.getCredentials('openRouterCommunityApi');
 
-				const response = await this.helpers.request({
-					method: 'GET',
-					url: `${VIDEO_API_BASE}/models?output_modalities=video`,
-					headers: {
-						Authorization: `Bearer ${credentials.apiKey}`,
-					},
-					json: true,
-				});
+					const response = await this.helpers.request({
+						method: 'GET',
+						url: `${VIDEO_API_BASE}/models?output_modalities=video`,
+						headers: {
+							Authorization: `Bearer ${credentials.apiKey}`,
+						},
+						json: true,
+					});
 
-				const models = response.data || [];
-				let results = models.map((m: any) => ({
-					name: m.id.startsWith('~') ? m.id.substring(1) : m.id,
-					value: m.id,
-					description: m.description || '',
-				}));
+					const models = response.data || [];
+					let results = models.map((m: any) => ({
+						name: m.id.startsWith('~') ? m.id.substring(1) : m.id,
+						value: m.id,
+						description: m.description || '',
+					}));
 
-				results.sort((a: any, b: any) => a.name.localeCompare(b.name));
+					results.sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-				if (filter) {
-					const f = filter.toLowerCase();
-					results = results.filter(
-						(m: any) => m.name.toLowerCase().includes(f) || m.value.toLowerCase().includes(f),
-					);
+					if (filter) {
+						const f = filter.toLowerCase();
+						results = results.filter(
+							(m: any) => m.name.toLowerCase().includes(f) || m.value.toLowerCase().includes(f),
+						);
+					}
+
+					return { results };
+				} catch {
+					return { results: [] };
 				}
-
-				return { results };
 			},
 		},
 	};
@@ -361,10 +373,10 @@ export class OpenRouterVideo implements INodeType {
 					prompt,
 				};
 
-				// Optional params
-				if (videoOptions.aspectRatio) body.aspect_ratio = videoOptions.aspectRatio;
-				if (videoOptions.resolution) body.resolution = videoOptions.resolution;
-				if (videoOptions.duration) body.duration = videoOptions.duration;
+				// Optional params — only send when user explicitly overrides defaults
+				if (videoOptions.aspectRatio && videoOptions.aspectRatio !== '16:9') body.aspect_ratio = videoOptions.aspectRatio;
+				if (videoOptions.resolution && videoOptions.resolution !== '720p') body.resolution = videoOptions.resolution;
+				if (videoOptions.duration && videoOptions.duration !== 5) body.duration = videoOptions.duration;
 				if (videoOptions.generateAudio === true) body.generate_audio = true;
 				if (videoOptions.seed && videoOptions.seed !== 0) body.seed = videoOptions.seed;
 
@@ -393,18 +405,14 @@ export class OpenRouterVideo implements INodeType {
 								imageUrl = sanitizeUrl(rawUrl);
 							}
 
-							const ref: any = {
-								type: 'image_url',
-								role: frame.frameRole || 'first',
-							};
-
-							if (imageData) {
-								ref.image_url = { url: imageData };
-							} else if (imageUrl) {
-								ref.image_url = { url: imageUrl };
+							// Only push ref when we have valid image data or URL
+							if (imageData || imageUrl) {
+								frameRefs.push({
+									type: 'image_url',
+									role: frame.frameRole || 'first',
+									image_url: { url: imageData || imageUrl! },
+								});
 							}
-
-							frameRefs.push(ref);
 						}
 
 						if (frameRefs.length > 0) {
@@ -429,6 +437,20 @@ export class OpenRouterVideo implements INodeType {
 					);
 				}
 
+				if (videoOptions.waitForCompletion === false) {
+					returnData.push({
+						json: {
+							jobId,
+							model,
+							prompt,
+							status: 'submitted',
+							message: `Video generation submitted. You can check the status via GET ${VIDEO_API_BASE}/videos/${jobId}`,
+						},
+						pairedItem: { item: i },
+					});
+					continue;
+				}
+
 				// ─── Poll for completion ───────────────────────────────────
 				const maxWaitMs = (videoOptions.pollTimeoutSecs || 300) * 1000;
 				const startTime = Date.now();
@@ -437,9 +459,20 @@ export class OpenRouterVideo implements INodeType {
 
 				while (attempts < MAX_POLL_ATTEMPTS) {
 					if (Date.now() - startTime > maxWaitMs) {
-						throw new Error(
-							`Video generation timed out after ${videoOptions.pollTimeoutSecs || 300}s. Job ID: ${jobId}. You can check the status later.`,
-						);
+						// Return job info instead of throwing — user can resume with the jobId
+						returnData.push({
+							json: {
+								jobId,
+								model,
+								prompt,
+								status: 'timeout',
+								videoUrl: '',
+								message: `Video generation timed out after ${videoOptions.pollTimeoutSecs || 300}s. Use the jobId to check status via GET /api/v1/videos/${jobId}`,
+								pollAttempts: attempts,
+							},
+							pairedItem: { item: i },
+						});
+						break;
 					}
 
 					await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
@@ -470,9 +503,8 @@ export class OpenRouterVideo implements INodeType {
 				}
 
 				if (!pollResult) {
-					throw new Error(
-						`Video generation polling exhausted ${MAX_POLL_ATTEMPTS} attempts. Job ID: ${jobId}`,
-					);
+					// Timed out — timeout item was already pushed inside the loop
+					continue;
 				}
 
 				// ─── Extract video URL ─────────────────────────────────────
@@ -502,6 +534,11 @@ export class OpenRouterVideo implements INodeType {
 					usage: pollResult.usage,
 				};
 
+				if (shouldDownload && !videoUrl) {
+					jsonResult.warning =
+						'Video generation completed, but no downloadable video URL was returned by the API.';
+				}
+
 				if (shouldDownload && videoUrl) {
 					const videoBuffer = (await this.helpers.request({
 						method: 'GET',
@@ -509,11 +546,12 @@ export class OpenRouterVideo implements INodeType {
 						encoding: null,
 					})) as Buffer;
 
-					const ext = videoUrl.includes('.mp4')
-						? 'mp4'
-						: videoUrl.includes('.webm')
-							? 'webm'
-							: 'mp4';
+					let ext = 'mp4';
+					try {
+						const urlPath = new URL(videoUrl).pathname;
+						if (urlPath.endsWith('.webm')) ext = 'webm';
+						else if (urlPath.endsWith('.mov')) ext = 'mov';
+					} catch { /* keep default mp4 */ }
 					const mimeType = ext === 'webm' ? 'video/webm' : 'video/mp4';
 					const fileName = `video_${jobId}.${ext}`;
 					const binaryData = await this.helpers.prepareBinaryData(

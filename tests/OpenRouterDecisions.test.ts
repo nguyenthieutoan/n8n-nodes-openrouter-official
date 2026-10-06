@@ -168,7 +168,7 @@ describe('OpenRouterDecisions Node', () => {
 							criteria: ['Can wait', 'This week', 'Blocking revenue'],
 						},
 					},
-					provider: { allow_fallbacks: true },
+					// provider field should NOT be present when allow_fallbacks is default true
 					session_id: 'test-session-123',
 				},
 				headers: expect.objectContaining({
