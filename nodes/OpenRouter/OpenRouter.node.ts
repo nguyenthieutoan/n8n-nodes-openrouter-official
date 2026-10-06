@@ -410,33 +410,6 @@ export class OpenRouter implements INodeType {
 						],
 					},
 					{
-						displayName: 'Custom Providers (Only)',
-						name: 'customProvidersOnly',
-						type: 'string',
-						default: '',
-						placeholder: 'e.g. google-ai-studio/flex, deepinfra',
-						description:
-							'Comma-separated list of provider slugs or tags to restrict routing to (sets \'provider.only\')',
-					},
-					{
-						displayName: 'Custom Provider Order',
-						name: 'customProviderOrder',
-						type: 'string',
-						default: '',
-						placeholder: 'e.g. Google AI Studio, Google Vertex',
-						description:
-							'Comma-separated list of provider names or slugs in order of priority (sets \'provider.order\')',
-					},
-					{
-						displayName: 'Ignore Providers',
-						name: 'customProvidersIgnore',
-						type: 'string',
-						default: '',
-						placeholder: 'e.g. together, fireworks',
-						description:
-							'Comma-separated list of provider names or slugs to skip (sets \'provider.ignore\')',
-					},
-					{
 						displayName: 'Provider Sort',
 						name: 'providerSort',
 						type: 'options',
@@ -604,10 +577,10 @@ export class OpenRouter implements INodeType {
 					if (!Array.isArray(endpoints) || endpoints.length === 0) {
 						return [
 							{
-								name: 'Default / Auto (No distinct endpoints found for this model)',
+								name: 'Default / Auto (OpenRouter automatic routing)',
 								value: '',
 								description:
-									'OpenRouter routes automatically. You can also specify Custom Providers (Only) below.',
+									'OpenRouter routes automatically to the best provider for this model',
 							},
 						];
 					}
@@ -662,9 +635,9 @@ export class OpenRouter implements INodeType {
 				} catch (error) {
 					return [
 						{
-							name: 'Default / Auto (Could not fetch endpoints)',
+							name: 'Default / Auto (OpenRouter automatic routing)',
 							value: '',
-							description: 'Check model parameter or network connection',
+							description: 'OpenRouter will route requests automatically',
 						},
 					];
 				}

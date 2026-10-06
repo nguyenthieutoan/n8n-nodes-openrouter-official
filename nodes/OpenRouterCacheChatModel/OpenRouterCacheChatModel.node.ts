@@ -524,33 +524,6 @@ export class OpenRouterCacheChatModel implements INodeType {
 						],
 					},
 					{
-						displayName: 'Custom Providers (Only)',
-						name: 'customProvidersOnly',
-						type: 'string',
-						default: '',
-						placeholder: 'e.g. google-ai-studio/flex, deepinfra',
-						description:
-							'Comma-separated list of provider slugs or tags to restrict routing to (sets \'provider.only\')',
-					},
-					{
-						displayName: 'Custom Provider Order',
-						name: 'customProviderOrder',
-						type: 'string',
-						default: '',
-						placeholder: 'e.g. Google AI Studio, Google Vertex',
-						description:
-							'Comma-separated list of provider names or slugs in order of priority (sets \'provider.order\')',
-					},
-					{
-						displayName: 'Ignore Providers',
-						name: 'customProvidersIgnore',
-						type: 'string',
-						default: '',
-						placeholder: 'e.g. together, fireworks',
-						description:
-							'Comma-separated list of provider names or slugs to skip (sets \'provider.ignore\')',
-					},
-					{
 						displayName: 'Provider Sort',
 						name: 'providerSort',
 						type: 'options',
@@ -664,10 +637,10 @@ export class OpenRouterCacheChatModel implements INodeType {
 					if (!Array.isArray(endpoints) || endpoints.length === 0) {
 						return [
 							{
-								name: 'Default / Auto (No distinct endpoints found for this model)',
+								name: 'Default / Auto (OpenRouter automatic routing)',
 								value: '',
 								description:
-									'OpenRouter routes automatically. You can also specify Custom Providers (Only) below.',
+									'OpenRouter routes automatically to the best provider for this model',
 							},
 						];
 					}
@@ -722,9 +695,9 @@ export class OpenRouterCacheChatModel implements INodeType {
 				} catch (error) {
 					return [
 						{
-							name: 'Default / Auto (Could not fetch endpoints)',
+							name: 'Default / Auto (OpenRouter automatic routing)',
 							value: '',
-							description: 'Check model parameter or network connection',
+							description: 'OpenRouter will route requests automatically',
 						},
 					];
 				}
@@ -846,44 +819,111 @@ export class OpenRouterCacheChatModel implements INodeType {
 }
 
 export function requireN8nDependency(dependencyName: string): any {
+	// 1. Try standard require first
 	try {
 		return require(dependencyName);
 	} catch (_) {}
 
-	const candidates: string[] = [];
-
-	const cwd = process.cwd();
-	candidates.push(cwd);
-
-	if (require.main && require.main.filename) {
-		let current = path.dirname(require.main.filename);
-		while (current && current !== '/' && current !== path.dirname(current)) {
-			candidates.push(current);
-			current = path.dirname(current);
+	const tryRequire = (targetPath: string) => {
+		try {
+			return require(targetPath);
+		} catch (_) {
+			return null;
 		}
+	};
+
+	// 2. Collect candidate base directories
+	const candidateDirs: string[] = [];
+
+	// Climb up from __dirname
+	let currentDir = __dirname;
+	while (currentDir) {
+		candidateDirs.push(currentDir);
+		const parent = path.dirname(currentDir);
+		if (parent === currentDir) break;
+		currentDir = parent;
 	}
 
-	let current = __dirname;
-	while (current && current !== '/' && current !== path.dirname(current)) {
-		candidates.push(current);
-		current = path.dirname(current);
-	}
-
+	// Climb up from process.cwd()
 	try {
-		const workflowResolve = require.resolve('n8n-workflow');
-		const index = workflowResolve.indexOf('node_modules');
-		if (index !== -1) {
-			candidates.push(workflowResolve.substring(0, index));
+		if (process.cwd()) {
+			let cwdDir = process.cwd();
+			while (cwdDir) {
+				candidateDirs.push(cwdDir);
+				const parent = path.dirname(cwdDir);
+				if (parent === cwdDir) break;
+				cwdDir = parent;
+			}
 		}
 	} catch (_) {}
 
-	const uniqueCandidates = [...new Set(candidates)];
-
-	for (const candidate of uniqueCandidates) {
-		const p = path.join(candidate, 'node_modules', dependencyName);
+	// Climb up from require.main.filename
+	if (require.main && require.main.filename) {
 		try {
-			return require(p);
+			let mainDir = path.dirname(require.main.filename);
+			while (mainDir) {
+				candidateDirs.push(mainDir);
+				const parent = path.dirname(mainDir);
+				if (parent === mainDir) break;
+				mainDir = parent;
+			}
 		} catch (_) {}
+	}
+
+	// Standard Docker / Global n8n paths
+	const globalPaths = [
+		'/home/node',
+		'/data',
+		'/usr/local/lib/node_modules/n8n',
+		'/usr/local/lib/node_modules',
+		'/usr/lib/node_modules',
+		'/opt/n8n',
+	];
+	for (const gp of globalPaths) {
+		candidateDirs.push(gp);
+	}
+
+	// 3. Try resolving relative to known n8n packages
+	const n8nPackages = [
+		'@n8n/n8n-nodes-langchain',
+		'n8n-nodes-base',
+		'n8n-workflow',
+		'n8n',
+	];
+	for (const pkg of n8nPackages) {
+		try {
+			const pkgPath = require.resolve(pkg);
+			let dir = path.dirname(pkgPath);
+			while (dir) {
+				candidateDirs.push(dir);
+				const parent = path.dirname(dir);
+				if (parent === dir) break;
+				dir = parent;
+			}
+		} catch (_) {}
+	}
+
+	const uniqueDirs = [...new Set(candidateDirs)];
+
+	// 4. Try require.resolve with search starting paths
+	for (const sDir of uniqueDirs) {
+		try {
+			const resolved = require.resolve(dependencyName, { paths: [sDir] });
+			const res = tryRequire(resolved);
+			if (res) return res;
+		} catch (_) {}
+	}
+
+	// 5. Direct path checks in candidates
+	for (const dir of uniqueDirs) {
+		let res = tryRequire(path.join(dir, 'node_modules', dependencyName));
+		if (res) return res;
+
+		res = tryRequire(path.join(dir, 'node_modules', '@n8n', 'n8n-nodes-langchain', 'node_modules', dependencyName));
+		if (res) return res;
+
+		res = tryRequire(path.join(dir, dependencyName));
+		if (res) return res;
 	}
 
 	throw new Error(`Could not resolve ${dependencyName} from n8n's runtime`);

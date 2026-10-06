@@ -588,6 +588,6 @@ describe('OpenRouterCacheChatModel loadOptions.getProviders', () => {
 		const result = await node.methods.loadOptions.getProviders.call(fakeContext);
 		expect(result).toHaveLength(1);
 		expect(result[0].value).toBe('');
-		expect(result[0].name).toContain('Could not fetch endpoints');
+		expect(result[0].name).toContain('OpenRouter automatic routing');
 	});
 });
